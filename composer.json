@@ -1,0 +1,35 @@
+{
+	"name": "eighteen73/media-manager",
+	"description": "Native media folders, private media, shared multisite media, and safety-first cleanup.",
+	"type": "wordpress-plugin",
+	"license": "GPL-2.0-or-later",
+	"minimum-stability": "dev",
+	"authors": [
+		{
+			"name": "eighteen73",
+			"email": "hello@eighteen73.co.uk"
+		}
+	],
+	"autoload": {
+		"psr-4": {
+			"Eighteen73\\MediaManager\\": "includes/classes/"
+		}
+	},
+	"require": {
+		"php": ">=7.4"
+	},
+	"require-dev": {
+		"eighteen73/wordpress-coding-standards": "^2.0.0",
+		"phpunit/phpunit": "^9.6",
+		"yoast/phpunit-polyfills": "^2.0"
+	},
+	"scripts": {
+		"lint": "./vendor/bin/phpcs",
+		"format": "./vendor/bin/phpcbf"
+	},
+	"config": {
+		"allow-plugins": {
+			"dealerdirect/phpcodesniffer-composer-installer": true
+		}
+	}
+}
