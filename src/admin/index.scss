@@ -157,6 +157,10 @@ body.media-manager-folders-active.upload-php
 	content: "\f464";
 }
 
+.media-manager-download-folder::before {
+	content: "\f316";
+}
+
 .media-manager-delete-folder::before {
 	content: "\f182";
 }

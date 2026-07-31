@@ -76,6 +76,100 @@ export async function deleteFolder(id) {
 }
 
 /**
+ * Download a folder as a zip of full-size originals.
+ *
+ * @param {number} id Folder ID.
+ * @return {Promise<{ blob: Blob, filename: string }>} Zip blob and filename.
+ */
+export async function downloadFolder(id) {
+	let response;
+
+	try {
+		response = await apiFetch({
+			path: `${ROOT}/folders/${id}/download`,
+			method: 'GET',
+			parse: false,
+		});
+	} catch (error) {
+		throw await normalizeDownloadError(error);
+	}
+
+	if (!response?.ok) {
+		throw await normalizeDownloadError(response);
+	}
+
+	const disposition = response.headers.get('Content-Disposition') || '';
+	const match = disposition.match(
+		/filename\*?=(?:UTF-8''|")?([^\";]+)"?/i
+	);
+	const filename = match
+		? decodeURIComponent(match[1].replace(/["']/g, '').trim())
+		: `folder-${id}.zip`;
+
+	const blob = await response.blob();
+	return { blob, filename };
+}
+
+/**
+ * Convert apiFetch / Response failures into Error instances with messages.
+ *
+ * @param {unknown} error Thrown value or failed Response.
+ * @return {Promise<Error>} Normalized error.
+ */
+async function normalizeDownloadError(error) {
+	if (error instanceof Error && error.message) {
+		return error;
+	}
+
+	let message = '';
+	let status;
+
+	if (error && typeof error === 'object') {
+		if (typeof error.json === 'function') {
+			try {
+				const data = await error.json();
+				message = data?.message || data?.code || '';
+				status = data?.data?.status || error.status;
+			} catch (_err) {
+				status = error.status;
+			}
+		} else if (error.message) {
+			message = error.message;
+			status = error?.data?.status;
+		} else if (error.code) {
+			message = error.message || error.code;
+			status = error?.data?.status;
+		}
+	}
+
+	const normalized = new Error(
+		message || 'Unable to download folder.'
+	);
+	normalized.code = 'media_manager_download_failed';
+	normalized.data = { status };
+	return normalized;
+}
+
+/**
+ * Trigger a browser file download from a blob.
+ *
+ * @param {Blob}   blob     File blob.
+ * @param {string} filename Download filename.
+ * @return {void}
+ */
+export function triggerBlobDownload(blob, filename) {
+	const url = URL.createObjectURL(blob);
+	const link = document.createElement('a');
+	link.href = url;
+	link.download = filename;
+	link.rel = 'noopener';
+	document.body.appendChild(link);
+	link.click();
+	link.remove();
+	window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/**
  * Assign attachments to a folder.
  *
  * @param {{ attachmentIds: number[], folderId: number, mode: 'add'|'move', confirm?: boolean }} data Assignment payload.

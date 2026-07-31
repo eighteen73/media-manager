@@ -2,7 +2,10 @@
  * Store unit tests.
  */
 
-import { filterTree, reducer, sortTree, DEFAULT_STATE } from './store';
+import { filterTree, reducer, sortTree, DEFAULT_STATE, actions } from './store';
+import * as api from './api';
+
+jest.mock( './api' );
 
 describe( 'filterTree', () => {
 	const tree = [
@@ -71,5 +74,57 @@ describe( 'reducer', () => {
 			isBusy: true,
 		} );
 		expect( state.isBusy ).toBe( true );
+	} );
+} );
+
+describe( 'downloadFolder action', () => {
+	beforeEach( () => {
+		jest.clearAllMocks();
+	} );
+
+	it( 'downloads a zip blob on success', async () => {
+		const blob = new Blob( [ 'zip' ], { type: 'application/zip' } );
+		api.downloadFolder.mockResolvedValue( {
+			blob,
+			filename: 'Photos.zip',
+		} );
+		api.triggerBlobDownload.mockImplementation( () => {} );
+
+		const dispatch = {
+			setBusy: jest.fn(),
+			setNotice: jest.fn(),
+		};
+
+		const thunk = actions.downloadFolder( 12 );
+		await thunk( { dispatch } );
+
+		expect( api.downloadFolder ).toHaveBeenCalledWith( 12 );
+		expect( api.triggerBlobDownload ).toHaveBeenCalledWith(
+			blob,
+			'Photos.zip'
+		);
+		expect( dispatch.setBusy ).toHaveBeenCalledWith( true );
+		expect( dispatch.setBusy ).toHaveBeenCalledWith( false );
+		expect( dispatch.setNotice ).toHaveBeenCalledWith( null );
+	} );
+
+	it( 'surfaces an error notice when download fails', async () => {
+		api.downloadFolder.mockRejectedValue(
+			new Error( 'This folder has no downloadable files.' )
+		);
+
+		const dispatch = {
+			setBusy: jest.fn(),
+			setNotice: jest.fn(),
+		};
+
+		const thunk = actions.downloadFolder( 12 );
+		await thunk( { dispatch } );
+
+		expect( dispatch.setNotice ).toHaveBeenCalledWith( {
+			status: 'error',
+			message: 'This folder has no downloadable files.',
+		} );
+		expect( dispatch.setBusy ).toHaveBeenCalledWith( false );
 	} );
 } );

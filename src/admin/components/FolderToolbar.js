@@ -13,6 +13,7 @@ import { __ } from '@wordpress/i18n';
  * @param {Function} props.onSort       Sort handler.
  * @param {Function} props.onCreate     Create handler.
  * @param {Function} props.onRename     Rename handler.
+ * @param {Function} props.onDownload   Download handler.
  * @param {Function} props.onDelete     Delete handler.
  * @param {boolean}  props.hasSelection Whether a folder is selected.
  * @param {boolean}  props.canDelete    Whether delete is allowed for selection.
@@ -24,6 +25,7 @@ export default function FolderToolbar( {
 	onSort,
 	onCreate,
 	onRename,
+	onDownload,
 	onDelete,
 	hasSelection,
 	canDelete = true,
@@ -56,7 +58,18 @@ export default function FolderToolbar( {
 							className={ `media-manager-edit-folder${ actionsClass }` }
 							onClick={ onRename }
 							disabled={ ! hasSelection }
+							title={ __( 'Edit folder', 'media-manager' ) }
 							aria-label={ __( 'Edit folder', 'media-manager' ) }
+						/>
+					) }
+					{ capabilities.view && (
+						<button
+							type="button"
+							className={ `media-manager-download-folder${ actionsClass }` }
+							onClick={ onDownload }
+							disabled={ ! hasSelection }
+							title={ __( 'Download folder', 'media-manager' ) }
+							aria-label={ __( 'Download folder', 'media-manager' ) }
 						/>
 					) }
 					{ capabilities.delete && (
@@ -65,6 +78,7 @@ export default function FolderToolbar( {
 							className={ `media-manager-delete-folder${ deleteClass }` }
 							onClick={ onDelete }
 							disabled={ ! hasSelection || ! canDelete }
+							title={ __( 'Delete folder', 'media-manager' ) }
 							aria-label={ __( 'Delete folder', 'media-manager' ) }
 						/>
 					) }

@@ -103,6 +103,7 @@ export default function FolderSidebar({
 		setPreferences,
 		createFolder,
 		updateFolder,
+		downloadFolder,
 		deleteFolder,
 		assign,
 	} = useDispatch(STORE_NAME);
@@ -257,6 +258,12 @@ export default function FolderSidebar({
 						),
 						id: folder.id,
 					});
+				}}
+				onDownload={async () => {
+					if (!selectedFolder || selectedFolder < 1) {
+						return;
+					}
+					await downloadFolder(selectedFolder);
 				}}
 				onDelete={async () => {
 					if (!selectedFolder || selectedFolder < 1 || folderMutationLocked) {

@@ -288,6 +288,25 @@ const actions = {
 			}
 		};
 	},
+	downloadFolder(id) {
+		return async ({ dispatch }) => {
+			dispatch.setBusy(true);
+			dispatch.setNotice(null);
+			try {
+				const { blob, filename } = await api.downloadFolder(id);
+				api.triggerBlobDownload(blob, filename);
+			} catch (error) {
+				dispatch.setNotice({
+					status: 'error',
+					message:
+						error?.message ||
+						__('Unable to download folder.', 'media-manager'),
+				});
+			} finally {
+				dispatch.setBusy(false);
+			}
+		};
+	},
 	assign(folderId, mode, attachmentIds = null) {
 		return async ({ dispatch, select }) => {
 			const ids =

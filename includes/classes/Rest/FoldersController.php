@@ -9,6 +9,7 @@ namespace Eighteen73\MediaManager\Rest;
 
 use Eighteen73\MediaManager\Folders\FolderService;
 use Eighteen73\MediaManager\Folders\FolderTree;
+use Eighteen73\MediaManager\Folders\FolderZipService;
 use Eighteen73\MediaManager\Permissions\AccessPolicy;
 use Eighteen73\MediaManager\Permissions\FolderPolicy;
 use Eighteen73\MediaManager\PrivateMedia\StorageConfig;
@@ -55,18 +56,27 @@ class FoldersController extends WP_REST_Controller {
 	private FolderPolicy $policy;
 
 	/**
+	 * Folder zip download service.
+	 *
+	 * @var FolderZipService
+	 */
+	private FolderZipService $zip;
+
+	/**
 	 * Constructor.
 	 *
-	 * @param AccessPolicy|null  $access  Optional access policy.
-	 * @param FolderService|null $service Optional service.
-	 * @param FolderTree|null    $tree    Optional tree builder.
-	 * @param FolderPolicy|null  $policy  Optional policy helper.
+	 * @param AccessPolicy|null     $access  Optional access policy.
+	 * @param FolderService|null    $service Optional service.
+	 * @param FolderTree|null       $tree    Optional tree builder.
+	 * @param FolderPolicy|null     $policy  Optional policy helper.
+	 * @param FolderZipService|null $zip     Optional zip service.
 	 */
 	public function __construct(
 		?AccessPolicy $access = null,
 		?FolderService $service = null,
 		?FolderTree $tree = null,
-		?FolderPolicy $policy = null
+		?FolderPolicy $policy = null,
+		?FolderZipService $zip = null
 	) {
 		$this->namespace = 'media-manager/v1';
 		$this->rest_base = 'folders';
@@ -74,6 +84,7 @@ class FoldersController extends WP_REST_Controller {
 		$this->service   = $service ?? new FolderService();
 		$this->tree      = $tree ?? new FolderTree();
 		$this->policy    = $policy ?? $this->service->policy();
+		$this->zip       = $zip ?? new FolderZipService( null, $this->access );
 	}
 
 	/**
@@ -121,6 +132,25 @@ class FoldersController extends WP_REST_Controller {
 					'methods'             => WP_REST_Server::DELETABLE,
 					'callback'            => [ $this, 'delete_item' ],
 					'permission_callback' => [ $this, 'delete_item_permissions_check' ],
+				],
+			]
+		);
+
+		register_rest_route(
+			$this->namespace,
+			'/' . $this->rest_base . '/(?P<id>[\d]+)/download',
+			[
+				[
+					'methods'             => WP_REST_Server::READABLE,
+					'callback'            => [ $this, 'download_item' ],
+					'permission_callback' => [ $this, 'download_item_permissions_check' ],
+					'args'                => [
+						'id' => [
+							'type'              => 'integer',
+							'required'          => true,
+							'sanitize_callback' => 'absint',
+						],
+					],
 				],
 			]
 		);
@@ -189,6 +219,34 @@ class FoldersController extends WP_REST_Controller {
 			return new WP_Error(
 				'media_manager_forbidden',
 				__( 'Sorry, you are not allowed to delete folders.', 'media-manager' ),
+				[ 'status' => rest_authorization_required_code() ]
+			);
+		}
+
+		return true;
+	}
+
+	/**
+	 * DOWNLOAD permissions.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return bool|WP_Error
+	 */
+	public function download_item_permissions_check( $request ) {
+		if ( ! $this->access->can_view_folders() ) {
+			return new WP_Error(
+				'media_manager_forbidden',
+				__( 'Sorry, you are not allowed to view folders.', 'media-manager' ),
+				[ 'status' => rest_authorization_required_code() ]
+			);
+		}
+
+		$folder_id = (int) $request['id'];
+
+		if ( $folder_id < 1 || ! $this->access->can_access_folder( $folder_id ) ) {
+			return new WP_Error(
+				'media_manager_forbidden',
+				__( 'Sorry, you are not allowed to download this folder.', 'media-manager' ),
 				[ 'status' => rest_authorization_required_code() ]
 			);
 		}
@@ -294,6 +352,87 @@ class FoldersController extends WP_REST_Controller {
 				'id'      => (int) $request['id'],
 			]
 		);
+	}
+
+	/**
+	 * Download folder contents as a zip of full-size originals.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function download_item( $request ) {
+		$archive = $this->zip->create_archive( (int) $request['id'] );
+
+		if ( is_wp_error( $archive ) ) {
+			return $archive;
+		}
+
+		$path = $archive['path'];
+		register_shutdown_function(
+			static function () use ( $path ) {
+				if ( is_string( $path ) && file_exists( $path ) ) {
+					wp_delete_file( $path );
+				}
+			}
+		);
+
+		// PHPUnit dispatch() never reaches HTTP serving; return headers only.
+		if ( defined( 'WP_TESTS_DOMAIN' ) ) {
+			$response = new WP_REST_Response( null, 200 );
+			$response->header( 'Content-Type', 'application/zip' );
+			$response->header(
+				'Content-Disposition',
+				'attachment; filename="' . $archive['filename'] . '"'
+			);
+			$response->header( 'Content-Length', (string) filesize( $archive['path'] ) );
+			$response->header( 'Cache-Control', 'no-cache, must-revalidate, max-age=0' );
+
+			return $response;
+		}
+
+		$this->stream_archive( $archive );
+	}
+
+	/**
+	 * Stream a zip archive to the client and end the request.
+	 *
+	 * @param array{path:string,filename:string,count:int} $archive Archive meta.
+	 * @return void
+	 */
+	private function stream_archive( array $archive ): void {
+		$path = $archive['path'];
+
+		if ( ! is_string( $path ) || ! file_exists( $path ) ) {
+			status_header( 500 );
+			nocache_headers();
+			header( 'Content-Type: application/json; charset=UTF-8' );
+			echo wp_json_encode(
+				[
+					'code'    => 'media_manager_zip_missing',
+					'message' => __( 'The download archive could not be found.', 'media-manager' ),
+					'data'    => [ 'status' => 500 ],
+				]
+			);
+			exit;
+		}
+
+		// Discard any buffered output so the zip is not corrupted.
+		while ( ob_get_level() > 0 ) {
+			ob_end_clean();
+		}
+
+		status_header( 200 );
+		nocache_headers();
+		header( 'Content-Type: application/zip' );
+		header( 'Content-Disposition: attachment; filename="' . $archive['filename'] . '"' );
+		header( 'Content-Length: ' . (string) filesize( $path ) );
+		header( 'Content-Transfer-Encoding: binary' );
+		header( 'Cache-Control: no-cache, must-revalidate, max-age=0' );
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_readfile -- binary download stream.
+		readfile( $path );
+		wp_delete_file( $path );
+		exit;
 	}
 
 	/**

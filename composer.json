@@ -18,6 +18,9 @@
 	"require": {
 		"php": ">=7.4"
 	},
+	"suggest": {
+		"ext-zip": "Required to download folder contents as a zip archive."
+	},
 	"require-dev": {
 		"eighteen73/wordpress-coding-standards": "^2.0.0",
 		"phpunit/phpunit": "^9.6",
