@@ -14,7 +14,10 @@ use Eighteen73\MediaManager\Folders\AttachmentQuery;
 use Eighteen73\MediaManager\Folders\FolderTaxonomy;
 use Eighteen73\MediaManager\Folders\UploadAssignment;
 use Eighteen73\MediaManager\Install\Installer;
+use Eighteen73\MediaManager\PrivateMedia\Delivery;
+use Eighteen73\MediaManager\PrivateMedia\UrlFilters;
 use Eighteen73\MediaManager\Rest\AssignmentsController;
+use Eighteen73\MediaManager\Rest\AttachmentFields;
 use Eighteen73\MediaManager\Rest\FoldersController;
 use Eighteen73\MediaManager\Rest\PreferencesController;
 
@@ -40,6 +43,9 @@ class Plugin {
 		( new FolderTaxonomy() )->register();
 		( new AttachmentQuery() )->register();
 		( new UploadAssignment() )->register();
+		( new AttachmentFields() )->register();
+		( new Delivery() )->register();
+		( new UrlFilters() )->register();
 		( new Assets() )->register();
 		( new MediaLibrary() )->register();
 		( new Settings() )->register();

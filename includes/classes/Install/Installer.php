@@ -29,7 +29,7 @@ class Installer {
 	 *
 	 * @var string
 	 */
-	public const VERSION = '0.1.0';
+	public const VERSION = '0.2.2';
 
 	/**
 	 * Run activation tasks.
@@ -43,14 +43,54 @@ class Installer {
 		if ( false === get_option( Settings::OPTION, false ) ) {
 			add_option( Settings::OPTION, Settings::defaults(), '', false );
 		}
+
+		// Ensure private delivery rewrites are registered.
+		( new \Eighteen73\MediaManager\PrivateMedia\Delivery() )->add_rewrite_rules();
+		flush_rewrite_rules( false );
+
+		self::sync_existing_private_folders();
+		( new \Eighteen73\MediaManager\PrivateMedia\PrivateStorage() )->migrate_legacy_layout();
 	}
 
 	/**
-	 * Run deactivation tasks without removing data.
+	 * Move media already sitting in private folders into private storage.
+	 *
+	 * Covers folders marked private before transition-on-toggle existed.
+	 *
+	 * @return void
+	 */
+	private static function sync_existing_private_folders(): void {
+		$terms = get_terms(
+			[
+				'taxonomy'   => \Eighteen73\MediaManager\Folders\FolderTaxonomy::NAME,
+				'hide_empty' => false,
+				'fields'     => 'ids',
+			]
+		);
+
+		if ( is_wp_error( $terms ) || empty( $terms ) ) {
+			return;
+		}
+
+		$policy      = new \Eighteen73\MediaManager\Permissions\FolderPolicy();
+		$transitions = new \Eighteen73\MediaManager\PrivateMedia\TransitionService();
+
+		foreach ( $terms as $term_id ) {
+			$folder_policy = $policy->get( (int) $term_id );
+			if ( is_wp_error( $folder_policy ) || empty( $folder_policy['is_private'] ) ) {
+				continue;
+			}
+
+			$transitions->sync_folder_privacy( (int) $term_id, true );
+		}
+	}
+
+	/**
+	 * Deactivate without removing data.
 	 *
 	 * @return void
 	 */
 	public static function deactivate(): void {
-		// Intentionally preserve capabilities and data.
+		flush_rewrite_rules( false );
 	}
 }

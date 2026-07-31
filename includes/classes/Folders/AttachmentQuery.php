@@ -7,6 +7,8 @@
 
 namespace Eighteen73\MediaManager\Folders;
 
+use Eighteen73\MediaManager\Permissions\AccessPolicy;
+use Eighteen73\MediaManager\Permissions\EffectiveAcl;
 use WP_Error;
 
 defined( 'ABSPATH' ) || exit;
@@ -24,12 +26,34 @@ class AttachmentQuery {
 	private FolderRepository $repository;
 
 	/**
+	 * Effective ACL.
+	 *
+	 * @var EffectiveAcl
+	 */
+	private EffectiveAcl $acl;
+
+	/**
+	 * Access policy.
+	 *
+	 * @var AccessPolicy
+	 */
+	private AccessPolicy $access;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param FolderRepository|null $repository Optional repository.
+	 * @param EffectiveAcl|null     $acl        Optional ACL.
+	 * @param AccessPolicy|null     $access     Optional access policy.
 	 */
-	public function __construct( ?FolderRepository $repository = null ) {
+	public function __construct(
+		?FolderRepository $repository = null,
+		?EffectiveAcl $acl = null,
+		?AccessPolicy $access = null
+	) {
 		$this->repository = $repository ?? new FolderRepository();
+		$this->access     = $access ?? new AccessPolicy();
+		$this->acl        = $acl ?? new EffectiveAcl( $this->repository, null, $this->access );
 	}
 
 	/**
@@ -65,6 +89,14 @@ class AttachmentQuery {
 			return $folder;
 		}
 
+		if ( ! $this->acl->can_access_folder( $folder_id ) ) {
+			return new WP_Error(
+				'media_manager_forbidden_folder',
+				__( 'You cannot access that folder.', 'media-manager' ),
+				[ 'status' => 403 ]
+			);
+		}
+
 		return $folder_id;
 	}
 
@@ -76,42 +108,40 @@ class AttachmentQuery {
 	 * @return array
 	 */
 	public function apply( array $query, $folder_id ): array {
-		if ( null === $folder_id ) {
-			return $query;
-		}
+		if ( null !== $folder_id ) {
+			$tax_query = isset( $query['tax_query'] ) && is_array( $query['tax_query'] )
+				? $query['tax_query']
+				: [];
 
-		$tax_query = isset( $query['tax_query'] ) && is_array( $query['tax_query'] )
-			? $query['tax_query']
-			: [];
+			if ( 0 === (int) $folder_id ) {
+				$tax_query[] = [
+					'taxonomy' => FolderTaxonomy::NAME,
+					'operator' => 'NOT EXISTS',
+				];
+			} else {
+				$folder = $this->repository->find( (int) $folder_id );
 
-		if ( 0 === (int) $folder_id ) {
-			$tax_query[] = [
-				'taxonomy' => FolderTaxonomy::NAME,
-				'operator' => 'NOT EXISTS',
-			];
-		} else {
-			$folder = $this->repository->find( (int) $folder_id );
+				if ( is_wp_error( $folder ) ) {
+					$query['post__in'] = [ 0 ];
+					return $query;
+				}
 
-			if ( is_wp_error( $folder ) ) {
-				$query['post__in'] = [ 0 ];
-				return $query;
+				$tax_query[] = [
+					'taxonomy'         => FolderTaxonomy::NAME,
+					'field'            => 'term_id',
+					'terms'            => [ (int) $folder_id ],
+					'include_children' => true,
+				];
 			}
 
-			$tax_query[] = [
-				'taxonomy'         => FolderTaxonomy::NAME,
-				'field'            => 'term_id',
-				'terms'            => [ (int) $folder_id ],
-				'include_children' => true,
-			];
+			if ( count( $tax_query ) > 1 && ! isset( $tax_query['relation'] ) ) {
+				$tax_query['relation'] = 'AND';
+			}
+
+			$query['tax_query'] = $tax_query;
 		}
 
-		if ( count( $tax_query ) > 1 && ! isset( $tax_query['relation'] ) ) {
-			$tax_query['relation'] = 'AND';
-		}
-
-		$query['tax_query'] = $tax_query;
-
-		return $query;
+		return $this->acl->apply_to_query( $query, $folder_id );
 	}
 
 	/**
@@ -184,11 +214,11 @@ class AttachmentQuery {
 			return;
 		}
 
-		if ( ! isset( $_GET['media_manager_folder'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-			return;
+		$raw = null;
+		if ( isset( $_GET['media_manager_folder'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$raw = wp_unslash( $_GET['media_manager_folder'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 		}
 
-		$raw       = wp_unslash( $_GET['media_manager_folder'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 		$selection = $this->selection_from_request( $raw );
 
 		if ( is_wp_error( $selection ) ) {

@@ -22,7 +22,7 @@ export async function fetchFolders(recursiveCounts = true) {
 /**
  * Create a folder.
  *
- * @param {{ name: string, parent?: number }} data Folder data.
+ * @param {Object} data Folder data.
  * @return {Promise<Object>} Created folder.
  */
 export async function createFolder(data) {
@@ -32,6 +32,10 @@ export async function createFolder(data) {
 		data: {
 			name: data.name,
 			parent: data.parent || 0,
+			access_mode: data.access_mode || 'unrestricted',
+			allowed_roles: data.allowed_roles || [],
+			allowed_usernames: data.allowed_usernames || [],
+			is_private: !!data.is_private,
 		},
 	});
 }
@@ -39,8 +43,8 @@ export async function createFolder(data) {
 /**
  * Update a folder.
  *
- * @param {number}                           id   Folder ID.
- * @param {{ name: string, parent: number }} data Folder data.
+ * @param {number} id   Folder ID.
+ * @param {Object} data Folder data.
  * @return {Promise<Object>} Updated folder.
  */
 export async function updateFolder(id, data) {
@@ -50,6 +54,10 @@ export async function updateFolder(id, data) {
 		data: {
 			name: data.name,
 			parent: data.parent,
+			access_mode: data.access_mode,
+			allowed_roles: data.allowed_roles || [],
+			allowed_usernames: data.allowed_usernames || [],
+			is_private: !!data.is_private,
 		},
 	});
 }
@@ -70,7 +78,7 @@ export async function deleteFolder(id) {
 /**
  * Assign attachments to a folder.
  *
- * @param {{ attachmentIds: number[], folderId: number, mode: 'add'|'move' }} data Assignment payload.
+ * @param {{ attachmentIds: number[], folderId: number, mode: 'add'|'move', confirm?: boolean }} data Assignment payload.
  * @return {Promise<Object>} Assignment response.
  */
 export async function assignAttachments(data) {
@@ -81,6 +89,7 @@ export async function assignAttachments(data) {
 			attachment_ids: data.attachmentIds,
 			folder_id: data.folderId,
 			mode: data.mode,
+			confirm: !!data.confirm,
 		},
 	});
 }

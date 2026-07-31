@@ -227,6 +227,13 @@ function FolderNode( {
 				) }
 				<span className="media-manager-folder-nav__name">
 					{ node.name }
+					{ !! node.is_private && (
+						<span
+							className="media-manager-folder-nav__private dashicons dashicons-lock"
+							aria-label={ __( 'Private folder', 'media-manager' ) }
+							title={ __( 'Private folder', 'media-manager' ) }
+						/>
+					) }
 				</span>
 				{ showCount && (
 					<span className="media-manager-folder-nav__count">

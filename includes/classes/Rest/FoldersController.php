@@ -10,6 +10,8 @@ namespace Eighteen73\MediaManager\Rest;
 use Eighteen73\MediaManager\Folders\FolderService;
 use Eighteen73\MediaManager\Folders\FolderTree;
 use Eighteen73\MediaManager\Permissions\AccessPolicy;
+use Eighteen73\MediaManager\Permissions\FolderPolicy;
+use Eighteen73\MediaManager\PrivateMedia\StorageConfig;
 use WP_Error;
 use WP_REST_Controller;
 use WP_REST_Request;
@@ -46,22 +48,32 @@ class FoldersController extends WP_REST_Controller {
 	private FolderTree $tree;
 
 	/**
+	 * Folder policy helper.
+	 *
+	 * @var FolderPolicy
+	 */
+	private FolderPolicy $policy;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param AccessPolicy|null  $access  Optional access policy.
 	 * @param FolderService|null $service Optional service.
 	 * @param FolderTree|null    $tree    Optional tree builder.
+	 * @param FolderPolicy|null  $policy  Optional policy helper.
 	 */
 	public function __construct(
 		?AccessPolicy $access = null,
 		?FolderService $service = null,
-		?FolderTree $tree = null
+		?FolderTree $tree = null,
+		?FolderPolicy $policy = null
 	) {
 		$this->namespace = 'media-manager/v1';
 		$this->rest_base = 'folders';
 		$this->access    = $access ?? new AccessPolicy();
 		$this->service   = $service ?? new FolderService();
 		$this->tree      = $tree ?? new FolderTree();
+		$this->policy    = $policy ?? $this->service->policy();
 	}
 
 	/**
@@ -212,9 +224,16 @@ class FoldersController extends WP_REST_Controller {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function create_item( $request ) {
+		$policy = $this->policy_from_request( $request );
+
+		if ( is_wp_error( $policy ) ) {
+			return $policy;
+		}
+
 		$result = $this->service->create(
 			(string) $request->get_param( 'name' ),
-			(int) $request->get_param( 'parent' )
+			(int) $request->get_param( 'parent' ),
+			$policy
 		);
 
 		if ( is_wp_error( $result ) ) {
@@ -234,10 +253,19 @@ class FoldersController extends WP_REST_Controller {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function update_item( $request ) {
+		$policy = null;
+		if ( $this->request_has_policy( $request ) ) {
+			$policy = $this->policy_from_request( $request );
+			if ( is_wp_error( $policy ) ) {
+				return $policy;
+			}
+		}
+
 		$result = $this->service->update(
 			(int) $request['id'],
 			(string) $request->get_param( 'name' ),
-			(int) $request->get_param( 'parent' )
+			(int) $request->get_param( 'parent' ),
+			$policy
 		);
 
 		if ( is_wp_error( $result ) ) {
@@ -283,24 +311,109 @@ class FoldersController extends WP_REST_Controller {
 			'title'      => 'media-manager-folder',
 			'type'       => 'object',
 			'properties' => [
-				'id'     => [
+				'id'                => [
 					'type'     => 'integer',
 					'readonly' => true,
 				],
-				'name'   => [
+				'name'              => [
 					'type'              => 'string',
 					'required'          => true,
 					'sanitize_callback' => 'sanitize_text_field',
 				],
-				'parent' => [
+				'parent'            => [
 					'type'              => 'integer',
 					'default'           => 0,
 					'sanitize_callback' => 'absint',
+				],
+				'access_mode'       => [
+					'type'              => 'string',
+					'enum'              => [
+						FolderPolicy::MODE_UNRESTRICTED,
+						FolderPolicy::MODE_ROLES,
+						FolderPolicy::MODE_USERS,
+					],
+					'sanitize_callback' => 'sanitize_key',
+				],
+				'allowed_roles'     => [
+					'type'  => 'array',
+					'items' => [ 'type' => 'string' ],
+				],
+				'allowed_users'     => [
+					'type'  => 'array',
+					'items' => [
+						'type' => [ 'integer', 'string' ],
+					],
+				],
+				'allowed_usernames' => [
+					'type'  => 'array',
+					'items' => [ 'type' => 'string' ],
+				],
+				'is_private'        => [
+					'type' => 'boolean',
 				],
 			],
 		];
 
 		return $this->schema;
+	}
+
+	/**
+	 * Whether the request includes policy fields.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return bool
+	 */
+	private function request_has_policy( WP_REST_Request $request ): bool {
+		foreach ( [ 'access_mode', 'allowed_roles', 'allowed_users', 'allowed_usernames', 'is_private' ] as $key ) {
+			if ( null !== $request->get_param( $key ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Build a policy array from the request, enforcing private-cap and storage readiness.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return array|WP_Error
+	 */
+	private function policy_from_request( WP_REST_Request $request ) {
+		$policy = [
+			'access_mode'       => $request->get_param( 'access_mode' ) ?: FolderPolicy::MODE_UNRESTRICTED,
+			'allowed_roles'     => $request->get_param( 'allowed_roles' ) ?: [],
+			'allowed_users'     => $request->get_param( 'allowed_users' ) ?: [],
+			'allowed_usernames' => $request->get_param( 'allowed_usernames' ) ?: [],
+			'is_private'        => (bool) $request->get_param( 'is_private' ),
+		];
+
+		$folder_id   = isset( $request['id'] ) ? absint( $request['id'] ) : 0;
+		$was_private = false;
+		if ( $folder_id > 0 ) {
+			$current     = $this->policy->get( $folder_id );
+			$was_private = ! is_wp_error( $current ) && ! empty( $current['is_private'] );
+		}
+
+		if ( ! empty( $policy['is_private'] ) || ( $was_private && empty( $policy['is_private'] ) ) ) {
+			if ( ! $this->access->can_manage_private_folders() ) {
+				return new WP_Error(
+					'media_manager_forbidden',
+					__( 'Sorry, you are not allowed to manage private folders.', 'media-manager' ),
+					[ 'status' => rest_authorization_required_code() ]
+				);
+			}
+		}
+
+		if ( ! empty( $policy['is_private'] ) && ! ( new StorageConfig() )->is_ready() ) {
+			return new WP_Error(
+				'media_manager_private_storage_unready',
+				__( 'Configure a healthy private storage path before marking folders private.', 'media-manager' ),
+				[ 'status' => 400 ]
+			);
+		}
+
+		return $policy;
 	}
 
 	/**
@@ -310,11 +423,19 @@ class FoldersController extends WP_REST_Controller {
 	 * @return array
 	 */
 	private function prepare_folder( WP_Term $term ): array {
+		$policy = $this->policy->get( (int) $term->term_id );
+		$policy = is_wp_error( $policy ) ? $this->policy->defaults() : $policy;
+
 		return [
-			'id'     => (int) $term->term_id,
-			'name'   => $term->name,
-			'parent' => (int) $term->parent,
-			'count'  => (int) $term->count,
+			'id'                => (int) $term->term_id,
+			'name'              => $term->name,
+			'parent'            => (int) $term->parent,
+			'count'             => (int) $term->count,
+			'access_mode'       => $policy['access_mode'],
+			'allowed_roles'     => $policy['allowed_roles'],
+			'allowed_users'     => $policy['allowed_users'],
+			'allowed_usernames' => $this->policy->user_ids_to_logins( $policy['allowed_users'] ),
+			'is_private'        => $policy['is_private'],
 		];
 	}
 }

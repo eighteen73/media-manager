@@ -92,6 +92,35 @@ class FolderRepository {
 	}
 
 	/**
+	 * Attachment IDs directly assigned to a folder.
+	 *
+	 * @param int $folder_id Folder ID.
+	 * @return int[]
+	 */
+	public function attachment_ids_in_folder( int $folder_id ): array {
+		if ( $folder_id < 1 ) {
+			return [];
+		}
+
+		$ids = get_objects_in_term( $folder_id, FolderTaxonomy::NAME );
+
+		if ( is_wp_error( $ids ) || ! is_array( $ids ) ) {
+			return [];
+		}
+
+		$attachment_ids = [];
+
+		foreach ( $ids as $object_id ) {
+			$object_id = (int) $object_id;
+			if ( $object_id > 0 && 'attachment' === get_post_type( $object_id ) ) {
+				$attachment_ids[] = $object_id;
+			}
+		}
+
+		return array_values( array_unique( $attachment_ids ) );
+	}
+
+	/**
 	 * Set folder assignments for an attachment.
 	 *
 	 * @param int   $attachment_id Attachment ID.

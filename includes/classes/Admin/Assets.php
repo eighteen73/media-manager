@@ -159,35 +159,57 @@ class Assets {
 		$settings    = Settings::get_settings();
 		$preferences = ( new PreferencesController( $this->access ) )->get_item()->get_data();
 		$default     = isset( $settings['default_folder'] ) ? (int) $settings['default_folder'] : 0;
+		$roles       = [];
+		foreach ( wp_roles()->get_names() as $slug => $label ) {
+			$roles[] = [
+				'slug'  => $slug,
+				'label' => translate_user_role( $label ),
+			];
+		}
+
+		$storage = new \Eighteen73\MediaManager\PrivateMedia\StorageConfig();
 
 		return [
-			'restUrl'       => esc_url_raw( rest_url( 'media-manager/v1' ) ),
-			'restNonce'     => wp_create_nonce( 'wp_rest' ),
-			'settings'      => $settings,
-			'preferences'   => $preferences,
-			'capabilities'  => [
+			'restUrl'               => esc_url_raw( rest_url( 'media-manager/v1' ) ),
+			'restNonce'             => wp_create_nonce( 'wp_rest' ),
+			'settings'              => $settings,
+			'preferences'           => $preferences,
+			'capabilities'          => [
 				'view'     => $this->access->can_view_folders(),
 				'edit'     => $this->access->can_edit_folders(),
 				'delete'   => $this->access->can_delete_folders(),
 				'assign'   => $this->access->can_assign_folders(),
 				'settings' => $this->access->can_manage_settings(),
+				'private'  => $this->access->can_manage_private_folders(),
 			],
-			'defaultFolder' => $default > 0 ? $default : null,
-			'strings'       => [
-				'allMedia'      => __( 'All files', 'media-manager' ),
-				'uncategorized' => __( 'Uncategorized', 'media-manager' ),
-				'folders'       => __( 'Folders', 'media-manager' ),
-				'newFolder'     => __( 'New Folder', 'media-manager' ),
-				'renameFolder'  => __( 'Rename Folder', 'media-manager' ),
-				'deleteFolder'  => __( 'Delete Folder', 'media-manager' ),
-				'addToFolder'   => __( 'Add to Folder', 'media-manager' ),
-				'moveToFolder'  => __( 'Move to Folder', 'media-manager' ),
-				'moveItem'      => __( 'Move 1 item', 'media-manager' ),
+			'roles'                 => $roles,
+			'currentUserId'         => get_current_user_id(),
+			'privateStorageReady'   => $storage->is_ready(),
+			'privateStorageMessage' => $storage->health()['message'],
+			'defaultFolder'         => $default > 0 ? $default : null,
+			'strings'               => [
+				'allMedia'            => __( 'All files', 'media-manager' ),
+				'uncategorized'       => __( 'Uncategorized', 'media-manager' ),
+				'folders'             => __( 'Folders', 'media-manager' ),
+				'newFolder'           => __( 'New Folder', 'media-manager' ),
+				'renameFolder'        => __( 'Rename Folder', 'media-manager' ),
+				'deleteFolder'        => __( 'Delete Folder', 'media-manager' ),
+				'addToFolder'         => __( 'Add to Folder', 'media-manager' ),
+				'moveToFolder'        => __( 'Move to Folder', 'media-manager' ),
+				'moveItem'            => __( 'Move 1 item', 'media-manager' ),
 				/* translators: %d: number of media items */
-				'moveItems'     => __( 'Move %d items', 'media-manager' ),
-				'searchFolders' => __( 'Search folders', 'media-manager' ),
-				'loading'       => __( 'Loading folders…', 'media-manager' ),
-				'empty'         => __( 'No folders yet.', 'media-manager' ),
+				'moveItems'           => __( 'Move %d items', 'media-manager' ),
+				'searchFolders'       => __( 'Search folders', 'media-manager' ),
+				'loading'             => __( 'Loading folders…', 'media-manager' ),
+				'empty'               => __( 'No folders yet.', 'media-manager' ),
+				'privateConfirmEnter' => __(
+					'Moving into a private folder replaces all public folder relationships and stores files outside the public web root. Continue?',
+					'media-manager'
+				),
+				'privateConfirmLeave' => __(
+					'Leaving private storage makes these files publicly reachable again. Continue?',
+					'media-manager'
+				),
 			],
 		];
 	}

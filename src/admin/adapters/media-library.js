@@ -97,6 +97,151 @@ export function setCollectionFolder( collection, folderId ) {
 }
 
 /**
+ * Patch Media Library "File URL" / copy-link inputs from a model.
+ *
+ * @param {Object} model Attachment model.
+ * @return {void}
+ */
+function syncAttachmentUrlFields( model ) {
+	const url = model?.get?.( 'url' );
+	if ( ! url ) {
+		return;
+	}
+
+	const selectors = [
+		'#attachment-details-two-column-copy-link',
+		'#attachment-details-copy-link',
+		'.attachment-details .copy-to-clipboard-container input',
+		'.attachment-info .copy-to-clipboard-container input',
+		'.attachment-details input[readonly]',
+		'.media-sidebar input[readonly]',
+		'.attachment-details input[type="text"]',
+	];
+
+	selectors.forEach( ( selector ) => {
+		document.querySelectorAll( selector ).forEach( ( input ) => {
+			if ( ! ( input instanceof HTMLInputElement ) ) {
+				return;
+			}
+			const looksLikeUrl =
+				input.id.includes( 'copy-link' ) ||
+				input.className.includes( 'url' ) ||
+				/^https?:\/\//.test( input.value ) ||
+				input.readOnly;
+			if ( looksLikeUrl ) {
+				input.value = url;
+			}
+		} );
+	} );
+}
+
+/**
+ * Force-refresh visible Media Library models so private URLs update.
+ *
+ * @param {Object} [frame] Optional media frame.
+ * @return {void}
+ */
+export function refreshVisibleMedia( frame = null ) {
+	const mediaFrame = frame || window.wp?.media?.frame;
+	let library = null;
+	let selection = null;
+
+	try {
+		library = resolveLibraryCollection( mediaFrame );
+	} catch ( _error ) {
+		library = null;
+	}
+
+	try {
+		const state =
+			mediaFrame && typeof mediaFrame.state === 'function'
+				? mediaFrame.state()
+				: null;
+		selection = state?.get?.( 'selection' ) || null;
+	} catch ( _error ) {
+		selection = null;
+	}
+
+	const refreshed = new Set();
+	const pending = [];
+
+	const refreshModel = ( model ) => {
+		if ( ! model?.fetch ) {
+			return;
+		}
+
+		const id = model.get?.( 'id' ) || model.id;
+		if ( id && refreshed.has( id ) ) {
+			return;
+		}
+		if ( id ) {
+			refreshed.add( id );
+		}
+
+		const apply = () => {
+			const url = model.get?.( 'url' );
+			if ( url && typeof model.set === 'function' ) {
+				model.set( { url, link: url } );
+			}
+			syncAttachmentUrlFields( model );
+		};
+
+		const result = model.fetch();
+		pending.push( result );
+		if ( result && typeof result.done === 'function' ) {
+			result.done( apply );
+		} else if ( result && typeof result.then === 'function' ) {
+			result.then( apply ).catch( () => {} );
+		} else {
+			window.setTimeout( apply, 300 );
+		}
+	};
+
+	selection?.each?.( refreshModel );
+
+	const selected = document.querySelectorAll(
+		'.attachment.selected, .attachment[aria-checked="true"], .attachment.details, .attachments .selected'
+	);
+	selected.forEach( ( el ) => {
+		const id = parseInt( el.dataset?.id || el.getAttribute( 'data-id' ), 10 );
+		if ( ! id || ! window.wp?.media?.attachment ) {
+			return;
+		}
+		refreshModel( window.wp.media.attachment( id ) );
+	} );
+
+	const detailsId = parseInt(
+		document
+			.querySelector(
+				'.attachment-details[data-id], .media-sidebar .attachment-details'
+			)
+			?.getAttribute?.( 'data-id' ) ||
+			document.querySelector( '.attachment.details' )?.dataset?.id ||
+			0,
+		10
+	);
+	if ( detailsId > 0 && window.wp?.media?.attachment ) {
+		refreshModel( window.wp.media.attachment( detailsId ) );
+	}
+
+	library?.each?.( refreshModel );
+
+	// Avoid racing a library reset over in-flight model fetches (stale URLs win).
+	const refetchLibrary = () => {
+		if ( library?.fetch ) {
+			library.fetch( { reset: true, remove: true } );
+		}
+	};
+
+	const jq = window.jQuery;
+	if ( jq && pending.length && typeof jq.when === 'function' ) {
+		jq.when( ...pending.filter( Boolean ) ).always( refetchLibrary );
+	} else {
+		window.setTimeout( refetchLibrary, 400 );
+	}
+}
+
+/**
  * Mount the Media Library sidebar root into #wpbody with a resize handle.
  *
  * @param {{ root: HTMLElement, store?: Object }} options Mount options.

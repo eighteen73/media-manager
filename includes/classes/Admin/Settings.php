@@ -10,6 +10,7 @@ namespace Eighteen73\MediaManager\Admin;
 use Eighteen73\MediaManager\Folders\FolderRepository;
 use Eighteen73\MediaManager\Permissions\AccessPolicy;
 use Eighteen73\MediaManager\Permissions\Capabilities;
+use Eighteen73\MediaManager\PrivateMedia\StorageConfig;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -67,11 +68,12 @@ class Settings {
 	 */
 	public static function defaults(): array {
 		return [
-			'show_count'         => true,
-			'show_search'        => true,
-			'show_list_view'     => true,
-			'show_modal_sidebar' => true,
-			'default_folder'     => 0,
+			'show_count'           => true,
+			'show_search'          => true,
+			'show_list_view'       => true,
+			'show_modal_sidebar'   => true,
+			'default_folder'       => 0,
+			'private_storage_path' => '',
 		];
 	}
 
@@ -159,6 +161,23 @@ class Settings {
 			'media-manager',
 			'media_manager_general'
 		);
+
+		add_settings_section(
+			'media_manager_private',
+			__( 'Private storage', 'media-manager' ),
+			static function (): void {
+				echo '<p>' . esc_html__( 'Private folders store files outside the public web root. Configure an absolute writable path that is not inside ABSPATH or uploads.', 'media-manager' ) . '</p>';
+			},
+			'media-manager'
+		);
+
+		add_settings_field(
+			'private_storage_path',
+			__( 'Private storage path', 'media-manager' ),
+			[ $this, 'render_private_storage_field' ],
+			'media-manager',
+			'media_manager_private'
+		);
 	}
 
 	/**
@@ -186,6 +205,14 @@ class Settings {
 		}
 
 		$output['default_folder'] = $default_folder;
+
+		$path                           = isset( $input['private_storage_path'] ) ? trim( (string) $input['private_storage_path'] ) : '';
+		$path                           = str_replace( "\0", '', $path );
+		$output['private_storage_path'] = untrailingslashit( $path );
+
+		// Keep private delivery rewrites current whenever settings are saved.
+		( new \Eighteen73\MediaManager\PrivateMedia\Delivery() )->add_rewrite_rules();
+		flush_rewrite_rules( false );
 
 		return $output;
 	}
@@ -238,6 +265,31 @@ class Settings {
 
 		echo '</select>';
 		echo '<p class="description">' . esc_html__( 'Used when a user has no previous folder preference.', 'media-manager' ) . '</p>';
+	}
+
+	/**
+	 * Render private storage path + health.
+	 *
+	 * @return void
+	 */
+	public function render_private_storage_field(): void {
+		$settings = self::get_settings();
+		$path     = (string) $settings['private_storage_path'];
+		$health   = ( new StorageConfig() )->health();
+
+		printf(
+			'<input type="text" class="large-text code" name="%1$s[private_storage_path]" value="%2$s" placeholder="%3$s" />',
+			esc_attr( self::OPTION ),
+			esc_attr( $path ),
+			esc_attr( '/var/www/private-media' )
+		);
+
+		$class = ! empty( $health['ok'] ) ? 'notice notice-success inline' : 'notice notice-warning inline';
+		printf(
+			'<div class="%1$s"><p>%2$s</p></div>',
+			esc_attr( $class ),
+			esc_html( $health['message'] )
+		);
 	}
 
 	/**

@@ -9,6 +9,9 @@ namespace Eighteen73\MediaManager\Rest;
 
 use Eighteen73\MediaManager\Folders\FolderRepository;
 use Eighteen73\MediaManager\Permissions\AccessPolicy;
+use Eighteen73\MediaManager\Permissions\AclCache;
+use Eighteen73\MediaManager\Permissions\FolderPolicy;
+use Eighteen73\MediaManager\PrivateMedia\TransitionService;
 use WP_Error;
 use WP_REST_Controller;
 use WP_REST_Request;
@@ -44,16 +47,39 @@ class AssignmentsController extends WP_REST_Controller {
 	private FolderRepository $repository;
 
 	/**
+	 * Folder policy.
+	 *
+	 * @var FolderPolicy
+	 */
+	private FolderPolicy $policy;
+
+	/**
+	 * Transition service.
+	 *
+	 * @var TransitionService
+	 */
+	private TransitionService $transitions;
+
+	/**
 	 * Constructor.
 	 *
-	 * @param AccessPolicy|null     $access     Optional access policy.
-	 * @param FolderRepository|null $repository Optional repository.
+	 * @param AccessPolicy|null      $access      Optional access policy.
+	 * @param FolderRepository|null  $repository  Optional repository.
+	 * @param FolderPolicy|null      $policy      Optional policy.
+	 * @param TransitionService|null $transitions Optional transitions.
 	 */
-	public function __construct( ?AccessPolicy $access = null, ?FolderRepository $repository = null ) {
-		$this->namespace  = 'media-manager/v1';
-		$this->rest_base  = 'assignments';
-		$this->access     = $access ?? new AccessPolicy();
-		$this->repository = $repository ?? new FolderRepository();
+	public function __construct(
+		?AccessPolicy $access = null,
+		?FolderRepository $repository = null,
+		?FolderPolicy $policy = null,
+		?TransitionService $transitions = null
+	) {
+		$this->namespace   = 'media-manager/v1';
+		$this->rest_base   = 'assignments';
+		$this->access      = $access ?? new AccessPolicy();
+		$this->repository  = $repository ?? new FolderRepository();
+		$this->policy      = $policy ?? new FolderPolicy( $this->repository );
+		$this->transitions = $transitions ?? new TransitionService( null, $this->repository, $this->policy );
 	}
 
 	/**
@@ -87,6 +113,11 @@ class AssignmentsController extends WP_REST_Controller {
 							'required'          => true,
 							'enum'              => [ 'add', 'move' ],
 							'sanitize_callback' => 'sanitize_key',
+						],
+						'confirm'        => [
+							'type'              => 'boolean',
+							'default'           => false,
+							'sanitize_callback' => 'rest_sanitize_boolean',
 						],
 					],
 				],
@@ -144,6 +175,7 @@ class AssignmentsController extends WP_REST_Controller {
 		$attachment_ids = $request->get_param( 'attachment_ids' );
 		$folder_id      = (int) $request->get_param( 'folder_id' );
 		$mode           = (string) $request->get_param( 'mode' );
+		$confirm        = (bool) $request->get_param( 'confirm' );
 
 		if ( empty( $attachment_ids ) ) {
 			return new WP_Error(
@@ -173,15 +205,42 @@ class AssignmentsController extends WP_REST_Controller {
 			);
 		}
 
+		$target_private = false;
+
 		if ( $folder_id > 0 ) {
 			$folder = $this->repository->find( $folder_id );
 
 			if ( is_wp_error( $folder ) ) {
 				return $folder;
 			}
+
+			if ( ! $this->access->can_access_folder( $folder_id ) ) {
+				return new WP_Error(
+					'media_manager_forbidden_folder',
+					__( 'You cannot assign media to that folder.', 'media-manager' ),
+					[ 'status' => 403 ]
+				);
+			}
+
+			$policy = $this->policy->get_effective( $folder_id );
+			if ( is_wp_error( $policy ) ) {
+				return $policy;
+			}
+
+			$target_private = ! empty( $policy['is_private'] );
+
+			if ( $target_private && 'add' === $mode ) {
+				return new WP_Error(
+					'media_manager_private_requires_move',
+					__( 'Private folders are exclusive. Use Move instead of Add.', 'media-manager' ),
+					[ 'status' => 400 ]
+				);
+			}
 		}
 
-		$errors = [];
+		$errors      = [];
+		$needs_enter = false;
+		$needs_leave = false;
 
 		foreach ( $attachment_ids as $attachment_id ) {
 			$post = get_post( $attachment_id );
@@ -193,6 +252,27 @@ class AssignmentsController extends WP_REST_Controller {
 
 			if ( ! current_user_can( 'edit_post', $attachment_id ) ) {
 				$errors[ $attachment_id ] = __( 'You cannot edit this attachment.', 'media-manager' );
+				continue;
+			}
+
+			if ( ! $this->access->can_view_attachment( $attachment_id ) ) {
+				$errors[ $attachment_id ] = __( 'You cannot access this attachment.', 'media-manager' );
+				continue;
+			}
+
+			if ( $this->transitions->is_blocked( $attachment_id ) ) {
+				$errors[ $attachment_id ] = __( 'Incomplete private transition blocks this change.', 'media-manager' );
+				continue;
+			}
+
+			$is_private = $this->transitions->is_private( $attachment_id );
+
+			if ( $target_private && ! $is_private ) {
+				$needs_enter = true;
+			}
+
+			if ( ! $target_private && $is_private ) {
+				$needs_leave = true;
 			}
 		}
 
@@ -207,8 +287,29 @@ class AssignmentsController extends WP_REST_Controller {
 			);
 		}
 
+		if ( ( $needs_enter || $needs_leave ) && ! $confirm ) {
+			return new WP_Error(
+				'media_manager_confirmation_required',
+				$needs_enter
+					? __( 'Moving into a private folder replaces all public folder relationships and stores files privately. Confirm to continue.', 'media-manager' )
+					: __( 'Leaving private storage makes these files public again. Confirm to continue.', 'media-manager' ),
+				[
+					'status'      => 409,
+					'needs_enter' => $needs_enter,
+					'needs_leave' => $needs_leave,
+				]
+			);
+		}
+
 		foreach ( $attachment_ids as $attachment_id ) {
-			if ( 'add' === $mode ) {
+			$is_private = $this->transitions->is_private( $attachment_id );
+
+			if ( $target_private ) {
+				$result = $this->transitions->enter_private( $attachment_id, $folder_id );
+			} elseif ( $is_private ) {
+				$ids    = $folder_id > 0 ? [ $folder_id ] : [];
+				$result = $this->transitions->leave_private( $attachment_id, $ids );
+			} elseif ( 'add' === $mode ) {
 				$result = $this->repository->set_attachment_folders( $attachment_id, [ $folder_id ], true );
 			} else {
 				$ids    = $folder_id > 0 ? [ $folder_id ] : [];
@@ -231,12 +332,14 @@ class AssignmentsController extends WP_REST_Controller {
 			);
 		}
 
+		AclCache::invalidate_site();
+
 		return rest_ensure_response(
 			[
 				'assigned'       => true,
 				'attachment_ids' => $attachment_ids,
 				'folder_id'      => $folder_id,
-				'mode'           => $mode,
+				'mode'           => $target_private ? 'move' : $mode,
 			]
 		);
 	}

@@ -201,12 +201,16 @@ const actions = {
 			}
 		};
 	},
-	createFolder(name, parent = 0) {
+	createFolder(payload, parent = 0) {
 		return async ({ dispatch }) => {
+			const data =
+				typeof payload === 'string'
+					? { name: payload, parent }
+					: { parent: 0, ...payload };
 			dispatch.setBusy(true);
 			dispatch.setNotice(null);
 			try {
-				await api.createFolder({ name, parent });
+				await api.createFolder(data);
 				await dispatch.loadFolders();
 			} catch (error) {
 				dispatch.setNotice({
@@ -221,12 +225,16 @@ const actions = {
 			}
 		};
 	},
-	updateFolder(id, name, parent) {
+	updateFolder(id, payload, parent = 0) {
 		return async ({ dispatch }) => {
+			const data =
+				typeof payload === 'string'
+					? { name: payload, parent }
+					: { ...payload };
 			dispatch.setBusy(true);
 			dispatch.setNotice(null);
 			try {
-				await api.updateFolder(id, { name, parent });
+				await api.updateFolder(id, data);
 				await dispatch.loadFolders();
 			} catch (error) {
 				dispatch.setNotice({
@@ -277,6 +285,26 @@ const actions = {
 				});
 				return false;
 			}
+
+			const folder = findFolderNode(select.getTree(), folderId);
+			const boot = window.mediaManagerAdmin || {};
+			let confirm = false;
+
+			if (folder?.is_private) {
+				const ok = window.confirm(
+					boot.strings?.privateConfirmEnter ||
+						__(
+							'Moving into a private folder replaces public relationships. Continue?',
+							'media-manager'
+						)
+				);
+				if (!ok) {
+					return false;
+				}
+				confirm = true;
+				mode = 'move';
+			}
+
 			dispatch.setBusy(true);
 			dispatch.setNotice(null);
 			try {
@@ -284,11 +312,46 @@ const actions = {
 					attachmentIds: ids,
 					folderId,
 					mode,
+					confirm,
 				});
 				dispatch.setSelectedAttachmentIds([]);
 				await dispatch.loadFolders();
 				return true;
 			} catch (error) {
+				const code = error?.code || error?.data?.code;
+				if (code === 'media_manager_confirmation_required') {
+					const needsEnter = !!error?.data?.needs_enter;
+					const message = needsEnter
+						? boot.strings?.privateConfirmEnter || error.message
+						: boot.strings?.privateConfirmLeave || error.message;
+					const ok = window.confirm(message);
+					if (ok) {
+						try {
+							await api.assignAttachments({
+								attachmentIds: ids,
+								folderId,
+								mode: needsEnter ? 'move' : mode,
+								confirm: true,
+							});
+							dispatch.setSelectedAttachmentIds([]);
+							await dispatch.loadFolders();
+							return true;
+						} catch (retryError) {
+							dispatch.setNotice({
+								status: 'error',
+								message:
+									retryError?.message ||
+									__(
+										'Unable to assign media to folder.',
+										'media-manager'
+									),
+							});
+							return false;
+						}
+					}
+					return false;
+				}
+
 				dispatch.setNotice({
 					status: 'error',
 					message:
@@ -387,3 +450,23 @@ export function registerStore() {
 }
 
 export { actions, selectors };
+
+/**
+ * Find a folder node by ID.
+ *
+ * @param {Array}  nodes Folder tree.
+ * @param {number} id    Folder ID.
+ * @return {Object|null} Folder node.
+ */
+function findFolderNode(nodes, id) {
+	for (const node of nodes || []) {
+		if (node.id === id) {
+			return node;
+		}
+		const child = findFolderNode(node.children || [], id);
+		if (child) {
+			return child;
+		}
+	}
+	return null;
+}

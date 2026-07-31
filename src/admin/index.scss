@@ -260,6 +260,25 @@ body.media-manager-folders-active.upload-php
 	padding-right: 42px;
 }
 
+.media-manager-folder-nav__name {
+	display: inline;
+}
+
+.media-manager-folder-nav__private {
+	display: inline-block;
+	margin-left: 4px;
+	width: 16px;
+	height: 16px;
+	font-size: 14px;
+	line-height: 32px;
+	vertical-align: top;
+	color: #646970;
+}
+
+.media-manager-folder-nav.is-current .media-manager-folder-nav__private {
+	color: #2271b1;
+}
+
 .media-manager-folder-nav::before {
 	position: absolute;
 	left: 8px;
@@ -468,20 +487,62 @@ body.media-manager-folders-active.upload-php
 	padding: 0;
 }
 
-.media-manager-modal__body fieldset input,
-.media-manager-modal__body fieldset select {
+.media-manager-modal__body fieldset input[type="text"],
+.media-manager-modal__body fieldset input[type="search"],
+.media-manager-modal__body fieldset input.input-text,
+.media-manager-modal__body fieldset select,
+.media-manager-modal__body fieldset textarea {
 	width: 100%;
 	max-width: 100%;
 	margin: 5px 0 0;
 	padding: 12px;
 	font-size: 13px;
 	line-height: 16px;
+	box-sizing: border-box;
 }
 
 .media-manager-modal__bottombar {
 	border-top: 1px solid #e0e0e0;
 	padding: 20px 32px 12px;
 	text-align: right;
+}
+
+.media-manager-checkbox {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	margin: 5px 0 0;
+	font-size: 13px;
+	font-weight: 400;
+	line-height: 1.4;
+	cursor: pointer;
+}
+
+.media-manager-checkbox input[type="checkbox"] {
+	flex: 0 0 auto;
+	width: 1rem;
+	height: 1rem;
+	margin: 0.15em 0 0;
+	padding: 0;
+	appearance: auto;
+	-webkit-appearance: checkbox;
+}
+
+.media-manager-role-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	max-height: 160px;
+	overflow: auto;
+	border: 1px solid #dcdcde;
+	padding: 10px 12px;
+	margin-top: 5px;
+	background: #fff;
+	box-sizing: border-box;
+}
+
+.media-manager-role-list .media-manager-checkbox {
+	margin: 0;
 }
 
 .media-manager-modal-backdrop {
