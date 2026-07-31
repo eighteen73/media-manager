@@ -156,9 +156,9 @@ class Assets {
 	 * @return array<string, mixed>
 	 */
 	private function get_boot_data(): array {
-		$settings    = Settings::get_settings();
+		$folder_ui   = Settings::get_folder_ui();
 		$preferences = ( new PreferencesController( $this->access ) )->get_item()->get_data();
-		$default     = isset( $settings['default_folder'] ) ? (int) $settings['default_folder'] : 0;
+		$default     = (int) $folder_ui['default_folder'];
 		$roles       = [];
 		foreach ( wp_roles()->get_names() as $slug => $label ) {
 			$roles[] = [
@@ -193,7 +193,7 @@ class Assets {
 		return [
 			'restUrl'               => esc_url_raw( rest_url( 'media-manager/v1' ) ),
 			'restNonce'             => wp_create_nonce( 'wp_rest' ),
-			'settings'              => $settings,
+			'settings'              => $folder_ui,
 			'preferences'           => $preferences,
 			'capabilities'          => [
 				'view'     => $this->access->can_view_folders(),

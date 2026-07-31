@@ -69,6 +69,10 @@ class ContentFolderService {
 		$types = get_post_types( [ 'show_ui' => true ], 'objects' );
 		unset( $types['attachment'] );
 
+		foreach ( self::excluded_post_types() as $slug ) {
+			unset( $types[ $slug ] );
+		}
+
 		/**
 		 * Filter eligible post types for generated media folders.
 		 *
@@ -77,6 +81,26 @@ class ContentFolderService {
 		$filtered = apply_filters( 'media_manager_eligible_post_types', $types );
 
 		return is_array( $filtered ) ? $filtered : $types;
+	}
+
+	/**
+	 * Non-content post types excluded from generated media folders.
+	 *
+	 * @return string[]
+	 */
+	private static function excluded_post_types(): array {
+		return [
+			'wp_navigation',
+			'wp_block',
+			'wp_template',
+			'wp_template_part',
+			'wp_global_styles',
+			'wp_font_face',
+			'wp_font_family',
+			'shop_order',
+			'shop_order_refund',
+			'shop_coupon',
+		];
 	}
 
 	/**

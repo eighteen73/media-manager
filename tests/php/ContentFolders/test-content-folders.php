@@ -386,4 +386,22 @@ class Test_Content_Folders extends WP_UnitTestCase {
 		$result = ( new FolderService() )->delete( $folder_id );
 		$this->assertTrue( $result );
 	}
+
+	/**
+	 * Eligible post types exclude non-content UI types and keep content types.
+	 *
+	 * @return void
+	 */
+	public function test_eligible_post_types_excludes_non_content_types() {
+		$types = ( new ContentFolderService() )->eligible_post_types();
+
+		$this->assertArrayHasKey( 'post', $types );
+		$this->assertArrayHasKey( 'page', $types );
+		$this->assertArrayNotHasKey( 'attachment', $types );
+		$this->assertArrayNotHasKey( 'wp_navigation', $types );
+		$this->assertArrayNotHasKey( 'wp_block', $types );
+		$this->assertArrayNotHasKey( 'wp_template', $types );
+		$this->assertArrayNotHasKey( 'wp_template_part', $types );
+		$this->assertArrayNotHasKey( 'wp_global_styles', $types );
+	}
 }

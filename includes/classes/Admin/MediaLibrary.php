@@ -90,9 +90,9 @@ class MediaLibrary {
 			return;
 		}
 
-		$settings = Settings::get_settings();
+		$folder_ui = Settings::get_folder_ui();
 
-		if ( empty( $settings['show_list_view'] ) ) {
+		if ( empty( $folder_ui['show_list_view'] ) ) {
 			return;
 		}
 
