@@ -227,10 +227,27 @@ function FolderNode( {
 				) }
 				<span className="media-manager-folder-nav__name">
 					{ node.name }
+					{ node.access_mode &&
+						node.access_mode !== 'unrestricted' && (
+							<span
+								className="media-manager-folder-nav__badge media-manager-folder-nav__restricted dashicons dashicons-lock"
+								aria-label={ __(
+									'Restricted folder',
+									'media-manager'
+								) }
+								title={ __(
+									'Restricted folder',
+									'media-manager'
+								) }
+							/>
+						) }
 					{ !! node.is_private && (
 						<span
-							className="media-manager-folder-nav__private dashicons dashicons-lock"
-							aria-label={ __( 'Private folder', 'media-manager' ) }
+							className="media-manager-folder-nav__badge media-manager-folder-nav__private dashicons dashicons-hidden"
+							aria-label={ __(
+								'Private folder',
+								'media-manager'
+							) }
 							title={ __( 'Private folder', 'media-manager' ) }
 						/>
 					) }

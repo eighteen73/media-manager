@@ -264,7 +264,7 @@ body.media-manager-folders-active.upload-php
 	display: inline;
 }
 
-.media-manager-folder-nav__private {
+.media-manager-folder-nav__badge {
 	display: inline-block;
 	margin-left: 4px;
 	width: 16px;
@@ -275,7 +275,7 @@ body.media-manager-folders-active.upload-php
 	color: #646970;
 }
 
-.media-manager-folder-nav.is-current .media-manager-folder-nav__private {
+.media-manager-folder-nav.is-current .media-manager-folder-nav__badge {
 	color: #2271b1;
 }
 
