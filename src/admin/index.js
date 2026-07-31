@@ -78,18 +78,72 @@ function bootstrapModals() {
 	teardowns.push(
 		observeMediaFrames( {
 			onFrame( frame ) {
+				let reactRoot = null;
+				let unsubscribe = null;
+				let mountEl = null;
+				let retryTimer = null;
+
+				const cleanupMount = () => {
+					if ( retryTimer ) {
+						window.clearTimeout( retryTimer );
+						retryTimer = null;
+					}
+					if ( unsubscribe ) {
+						unsubscribe();
+						unsubscribe = null;
+					}
+					if ( reactRoot ) {
+						reactRoot.unmount();
+						reactRoot = null;
+					}
+					if ( mountEl ) {
+						delete mountEl.dataset.mounted;
+						mountEl.remove();
+						mountEl = null;
+					}
+					frame.$el
+						?.find?.( '.attachments-browser' )
+						?.removeClass?.( 'has-media-manager-folders' );
+					frame.$el
+						?.get?.( 0 )
+						?.classList.remove( 'has-media-manager-folders' );
+				};
+
 				const mount = () => {
 					const el = ensureModalFolderMount( frame );
 					if ( ! el ) {
+						// Browse mode can fire render before AttachmentsBrowser is in the DOM.
+						if ( ! retryTimer ) {
+							retryTimer = window.setTimeout( () => {
+								retryTimer = null;
+								mount();
+							}, 50 );
+						}
 						return;
 					}
 
-					if ( el.dataset.mounted === '1' ) {
+					// Same browser node already hosting the sidebar.
+					if ( el === mountEl && el.dataset.mounted === '1' ) {
 						return;
 					}
+
+					// Browser was recreated (tab switch) — replace the previous root.
+					if ( reactRoot && el !== mountEl ) {
+						reactRoot.unmount();
+						reactRoot = null;
+						if ( unsubscribe ) {
+							unsubscribe();
+							unsubscribe = null;
+						}
+					}
+
+					mountEl = el;
 					el.dataset.mounted = '1';
 
-					const reactRoot = createRoot( el );
+					if ( ! reactRoot ) {
+						reactRoot = createRoot( el );
+					}
+
 					const library =
 						typeof frame.state === 'function'
 							? frame.state()?.get?.( 'library' )
@@ -103,19 +157,23 @@ function bootstrapModals() {
 						/>
 					);
 
-					const unsubscribe = subscribeToSelection( frame, ( ids ) => {
-						dispatch( STORE_NAME ).setSelectedAttachmentIds( ids );
-					} );
-
-					frame.on?.( 'close', () => {
-						unsubscribe();
-						reactRoot.unmount();
-						delete el.dataset.mounted;
-					} );
+					if ( ! unsubscribe ) {
+						unsubscribe = subscribeToSelection( frame, ( ids ) => {
+							dispatch( STORE_NAME ).setSelectedAttachmentIds(
+								ids
+							);
+						} );
+					}
 				};
 
 				frame.on?.( 'ready', mount );
+				// activate fires after the browse view is in the DOM; render can be too early.
+				frame.on?.( 'content:activate:browse', mount );
 				frame.on?.( 'content:render:browse', mount );
+				frame.on?.( 'content:create:browse', mount );
+				frame.on?.( 'content:render:upload', cleanupMount );
+				frame.on?.( 'content:activate:upload', cleanupMount );
+				frame.on?.( 'close', cleanupMount );
 				mount();
 			},
 		} )
@@ -135,11 +193,9 @@ function bootstrapUploadFolderSelect() {
 	);
 
 	if ( ! hasSidebarRoot ) {
-		const initial =
-			boot.preferences?.previous_folder ?? boot.defaultFolder ?? null;
-		if ( initial && Number( initial ) > 0 ) {
-			dispatch( STORE_NAME ).selectFolder( Number( initial ) );
-		}
+		// Load folders for Choose folder controls. Do not pre-select the
+		// generated post folder here — that would filter the modal library to an
+		// often-empty folder. Upload defaults use generatedFolderId as fallback.
 		dispatch( STORE_NAME ).loadFolders();
 	}
 
@@ -148,12 +204,17 @@ function bootstrapUploadFolderSelect() {
 			getProps: () => {
 				const store = select( STORE_NAME );
 				const selected = store.getSelectedFolder();
+				const generated =
+					boot.generatedFolderId &&
+					Number( boot.generatedFolderId ) > 0
+						? Number( boot.generatedFolderId )
+						: null;
 				return {
 					folders: store.getTree(),
 					value:
 						selected && Number( selected ) > 0
 							? Number( selected )
-							: null,
+							: generated,
 					canAssign: !! boot.capabilities.assign,
 				};
 			},

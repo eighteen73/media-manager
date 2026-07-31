@@ -61,21 +61,37 @@ export function filterTree(nodes, query) {
 
 /**
  * Sort a folder tree by name or count without destroying hierarchy.
+ * Top-level system roots stay first (then user folders); each group uses the active sort.
  *
  * @param {Array}  nodes Folder nodes.
  * @param {string} sort  Sort key.
+ * @param {number} depth Nesting depth (0 = top level).
  * @return {Array} Sorted nodes.
  */
-export function sortTree(nodes, sort) {
+export function sortTree(nodes, sort, depth = 0) {
 	const list = (nodes || []).map((node) => ({
 		...node,
-		children: sortTree(node.children || [], sort),
+		children: sortTree(node.children || [], sort, depth + 1),
 	}));
 
-	if (sort === 'count') {
-		list.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-	} else if (sort === 'a-z') {
-		list.sort((a, b) => a.name.localeCompare(b.name));
+	const compare = (a, b) => {
+		if (sort === 'count') {
+			return b.count - a.count || a.name.localeCompare(b.name) || a.id - b.id;
+		}
+		if (sort === 'a-z' || sort === '') {
+			return a.name.localeCompare(b.name) || a.id - b.id;
+		}
+		return 0;
+	};
+
+	if (depth === 0) {
+		const system = list.filter((node) => node.is_system_root).sort(compare);
+		const user = list.filter((node) => !node.is_system_root).sort(compare);
+		return [...system, ...user];
+	}
+
+	if (sort === 'count' || sort === 'a-z') {
+		list.sort(compare);
 	}
 
 	return list;

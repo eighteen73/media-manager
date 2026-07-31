@@ -10,6 +10,7 @@ namespace Eighteen73\MediaManager;
 use Eighteen73\MediaManager\Admin\Assets;
 use Eighteen73\MediaManager\Admin\MediaLibrary;
 use Eighteen73\MediaManager\Admin\Settings;
+use Eighteen73\MediaManager\ContentFolders\PostLifecycle;
 use Eighteen73\MediaManager\Folders\AttachmentQuery;
 use Eighteen73\MediaManager\Folders\FolderTaxonomy;
 use Eighteen73\MediaManager\Folders\UploadAssignment;
@@ -43,6 +44,7 @@ class Plugin {
 		( new FolderTaxonomy() )->register();
 		( new AttachmentQuery() )->register();
 		( new UploadAssignment() )->register();
+		( new PostLifecycle() )->register();
 		( new AttachmentFields() )->register();
 		( new Delivery() )->register();
 		( new UrlFilters() )->register();

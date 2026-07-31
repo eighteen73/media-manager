@@ -7,6 +7,7 @@
 
 namespace Eighteen73\MediaManager\Folders;
 
+use Eighteen73\MediaManager\ContentFolders\ContentFolderRepository;
 use Eighteen73\MediaManager\Permissions\EffectiveAcl;
 use Eighteen73\MediaManager\Permissions\FolderPolicy;
 
@@ -39,20 +40,30 @@ class FolderTree {
 	private FolderPolicy $policy;
 
 	/**
+	 * Content folder repository.
+	 *
+	 * @var ContentFolderRepository
+	 */
+	private ContentFolderRepository $content;
+
+	/**
 	 * Constructor.
 	 *
-	 * @param FolderRepository|null $repository Optional repository.
-	 * @param EffectiveAcl|null     $acl        Optional ACL.
-	 * @param FolderPolicy|null     $policy     Optional policy.
+	 * @param FolderRepository|null         $repository Optional repository.
+	 * @param EffectiveAcl|null             $acl        Optional ACL.
+	 * @param FolderPolicy|null             $policy     Optional policy.
+	 * @param ContentFolderRepository|null  $content    Optional content repository.
 	 */
 	public function __construct(
 		?FolderRepository $repository = null,
 		?EffectiveAcl $acl = null,
-		?FolderPolicy $policy = null
+		?FolderPolicy $policy = null,
+		?ContentFolderRepository $content = null
 	) {
 		$this->repository = $repository ?? new FolderRepository();
 		$this->policy     = $policy ?? new FolderPolicy( $this->repository );
 		$this->acl        = $acl ?? new EffectiveAcl( $this->repository, $this->policy );
+		$this->content    = $content ?? new ContentFolderRepository( $this->repository );
 	}
 
 	/**
@@ -106,20 +117,23 @@ class FolderTree {
 			$policy = $this->policy->get( $id );
 			$policy = is_wp_error( $policy ) ? $this->policy->defaults() : $policy;
 
-			$nodes[ $id ] = [
-				'id'                => $id,
-				'name'              => $term->name,
-				'parent'            => $parent,
-				'depth'             => 1,
-				'direct_count'      => isset( $direct_sets[ $id ] ) ? count( $direct_sets[ $id ] ) : 0,
-				'count'             => 0,
-				'children'          => [],
-				'access_mode'       => $policy['access_mode'],
-				'allowed_roles'     => $policy['allowed_roles'],
-				'allowed_users'     => $policy['allowed_users'],
-				'allowed_usernames' => $this->policy->user_ids_to_logins( $policy['allowed_users'] ),
-				'is_private'        => $policy['is_private'],
-			];
+			$nodes[ $id ] = array_merge(
+				[
+					'id'                => $id,
+					'name'              => $term->name,
+					'parent'            => $parent,
+					'depth'             => 1,
+					'direct_count'      => isset( $direct_sets[ $id ] ) ? count( $direct_sets[ $id ] ) : 0,
+					'count'             => 0,
+					'children'          => [],
+					'access_mode'       => $policy['access_mode'],
+					'allowed_roles'     => $policy['allowed_roles'],
+					'allowed_users'     => $policy['allowed_users'],
+					'allowed_usernames' => $this->policy->user_ids_to_logins( $policy['allowed_users'] ),
+					'is_private'        => $policy['is_private'],
+				],
+				$this->content->flags( $id )
+			);
 
 			$children[ $parent ]   = $children[ $parent ] ?? [];
 			$children[ $parent ][] = $id;
@@ -277,10 +291,33 @@ class FolderTree {
 		usort(
 			$branch,
 			static function ( array $a, array $b ): int {
+				$group_a = self::sort_group( $a );
+				$group_b = self::sort_group( $b );
+				if ( $group_a !== $group_b ) {
+					return $group_a <=> $group_b;
+				}
+
 				return strcasecmp( (string) $a['name'], (string) $b['name'] ) ?: ( $a['id'] <=> $b['id'] );
 			}
 		);
 
 		return $branch;
+	}
+
+	/**
+	 * Sort group: system roots, then generated, then user folders.
+	 *
+	 * @param array<string, mixed> $node Folder node.
+	 * @return int
+	 */
+	private static function sort_group( array $node ): int {
+		if ( ! empty( $node['is_system_root'] ) ) {
+			return 0;
+		}
+		if ( ! empty( $node['is_generated'] ) ) {
+			return 1;
+		}
+
+		return 2;
 	}
 }

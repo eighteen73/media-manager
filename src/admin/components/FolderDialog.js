@@ -65,6 +65,7 @@ export default function FolderDialog({
 	initialAllowedRoles = [],
 	initialAllowedUsernames = [],
 	initialIsPrivate = false,
+	lockStructure = false,
 	folders = [],
 	excludeId = 0,
 	onClose,
@@ -153,8 +154,10 @@ export default function FolderDialog({
 		setSubmitError('');
 		try {
 			await onSubmit({
-				name: name.trim(),
-				parent: Number(parent) || 0,
+				name: lockStructure ? initialName : name.trim(),
+				parent: lockStructure
+					? Number(initialParent) || 0
+					: Number(parent) || 0,
 				access_mode: accessMode,
 				allowed_roles: accessMode === 'roles' ? allowedRoles : [],
 				allowed_usernames:
@@ -222,7 +225,17 @@ export default function FolderDialog({
 									setName(event.target.value)
 								}
 								required
+								disabled={lockStructure}
+								readOnly={lockStructure}
 							/>
+							{lockStructure && (
+								<p className="description">
+									{__(
+										'Name and parent are managed automatically for post-type folders.',
+										'media-manager'
+									)}
+								</p>
+							)}
 						</fieldset>
 
 						<label htmlFor="media-manager-folder-parent">
@@ -232,6 +245,7 @@ export default function FolderDialog({
 							<select
 								id="media-manager-folder-parent"
 								value={parent}
+								disabled={lockStructure}
 								onChange={(event) => {
 									const next = event.target.value;
 									setParent(next);

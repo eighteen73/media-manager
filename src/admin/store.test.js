@@ -2,7 +2,7 @@
  * Store unit tests.
  */
 
-import { filterTree, reducer, DEFAULT_STATE } from './store';
+import { filterTree, reducer, sortTree, DEFAULT_STATE } from './store';
 
 describe( 'filterTree', () => {
 	const tree = [
@@ -27,6 +27,25 @@ describe( 'filterTree', () => {
 
 	it( 'returns the original tree when search is empty', () => {
 		expect( filterTree( tree, '' ) ).toEqual( tree );
+	} );
+} );
+
+describe( 'sortTree', () => {
+	it( 'keeps system roots first, then user folders alphabetically', () => {
+		const tree = [
+			{ id: 1, name: 'Zebra', is_system_root: false, children: [] },
+			{ id: 2, name: 'Posts', is_system_root: true, children: [] },
+			{ id: 3, name: 'Alpha', is_system_root: false, children: [] },
+			{ id: 4, name: 'Pages', is_system_root: true, children: [] },
+		];
+
+		const sorted = sortTree( tree, 'a-z' );
+		expect( sorted.map( ( node ) => node.name ) ).toEqual( [
+			'Pages',
+			'Posts',
+			'Alpha',
+			'Zebra',
+		] );
 	} );
 } );
 

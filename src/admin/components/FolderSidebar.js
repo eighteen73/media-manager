@@ -111,21 +111,35 @@ export default function FolderSidebar({
 		if (boot.preferences) {
 			setPreferences(boot.preferences);
 		}
-		const initial =
-			boot.preferences?.previous_folder ?? boot.defaultFolder ?? null;
+		// In the media modal, start browsing on All files. The post-generated
+		// folder remains the upload destination via Choose folder / uploader sync,
+		// so an empty content folder does not hide the library grid.
+		const initial = compact
+			? null
+			: boot.generatedFolderId ??
+				boot.preferences?.previous_folder ??
+				boot.defaultFolder ??
+				null;
 		selectFolder(initial);
 		loadFolders();
 	}, []);
 
 	useEffect(() => {
+		const mediaFrame = frame || window.wp?.media?.frame;
 		const library =
-			collection ||
-			resolveLibraryCollection(frame || window.wp?.media?.frame);
+			resolveLibraryCollection(mediaFrame) || collection;
 		if (library) {
 			setCollectionFolder(library, selectedFolder);
 		}
-		if (frame) {
-			syncFrameUploader(frame, selectedFolder);
+		if (mediaFrame) {
+			const uploadFolder =
+				selectedFolder && Number(selectedFolder) > 0
+					? selectedFolder
+					: boot.generatedFolderId &&
+						  Number(boot.generatedFolderId) > 0
+						? Number(boot.generatedFolderId)
+						: selectedFolder;
+			syncFrameUploader(mediaFrame, uploadFolder);
 		}
 		if (typeof onFolderChange === 'function') {
 			onFolderChange(selectedFolder);
@@ -184,6 +198,15 @@ export default function FolderSidebar({
 		setExpanded({ ...expanded, [id]: !expanded[id] });
 	};
 
+	const selectedFolderNode = useMemo(
+		() => findFolder(fullTree, selectedFolder),
+		[fullTree, selectedFolder]
+	);
+	const folderMutationLocked = !!(
+		selectedFolderNode?.is_system_root ||
+		(selectedFolderNode?.is_generated && !selectedFolderNode?.is_orphaned)
+	);
+
 	const width = preferences.sidebar_width || 300;
 
 	return (
@@ -228,11 +251,15 @@ export default function FolderSidebar({
 						initialAllowedRoles: folder.allowed_roles || [],
 						initialAllowedUsernames: folder.allowed_usernames || [],
 						initialIsPrivate: !!folder.is_private,
+						lockStructure: !!(
+							folder.is_system_root ||
+							(folder.is_generated && !folder.is_orphaned)
+						),
 						id: folder.id,
 					});
 				}}
 				onDelete={async () => {
-					if (!selectedFolder || selectedFolder < 1) {
+					if (!selectedFolder || selectedFolder < 1 || folderMutationLocked) {
 						return;
 					}
 					const confirmed = window.confirm(
@@ -246,6 +273,7 @@ export default function FolderSidebar({
 					}
 				}}
 				hasSelection={selectedFolder > 0}
+				canDelete={!folderMutationLocked}
 			/>
 
 			{error && (
@@ -306,6 +334,7 @@ export default function FolderSidebar({
 				initialAllowedRoles={dialog?.initialAllowedRoles || []}
 				initialAllowedUsernames={dialog?.initialAllowedUsernames || []}
 				initialIsPrivate={!!dialog?.initialIsPrivate}
+				lockStructure={!!dialog?.lockStructure}
 				folders={fullTree}
 				excludeId={dialog?.id || 0}
 				onClose={() => setDialog(null)}

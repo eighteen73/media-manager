@@ -7,6 +7,7 @@
 
 namespace Eighteen73\MediaManager\Folders;
 
+use Eighteen73\MediaManager\ContentFolders\ContentFolderService;
 use Eighteen73\MediaManager\Permissions\AclCache;
 use Eighteen73\MediaManager\Permissions\FolderPolicy;
 use Eighteen73\MediaManager\PrivateMedia\TransitionService;
@@ -49,23 +50,46 @@ class FolderService {
 	private TransitionService $transitions;
 
 	/**
+	 * Content folder service.
+	 *
+	 * @var ContentFolderService|null
+	 */
+	private ?ContentFolderService $content_folders = null;
+
+	/**
 	 * Constructor.
 	 *
-	 * @param FolderRepository|null   $repository  Optional repository.
-	 * @param HierarchyValidator|null $hierarchy   Optional validator.
-	 * @param FolderPolicy|null       $policy      Optional policy helper.
-	 * @param TransitionService|null  $transitions Optional transitions.
+	 * @param FolderRepository|null     $repository      Optional repository.
+	 * @param HierarchyValidator|null   $hierarchy       Optional validator.
+	 * @param FolderPolicy|null         $policy          Optional policy helper.
+	 * @param TransitionService|null    $transitions     Optional transitions.
+	 * @param ContentFolderService|null $content_folders Optional content folders.
 	 */
 	public function __construct(
 		?FolderRepository $repository = null,
 		?HierarchyValidator $hierarchy = null,
 		?FolderPolicy $policy = null,
-		?TransitionService $transitions = null
+		?TransitionService $transitions = null,
+		?ContentFolderService $content_folders = null
 	) {
-		$this->repository  = $repository ?? new FolderRepository();
-		$this->hierarchy   = $hierarchy ?? new HierarchyValidator( $this->repository );
-		$this->policy      = $policy ?? new FolderPolicy( $this->repository );
-		$this->transitions = $transitions ?? new TransitionService( null, $this->repository, $this->policy );
+		$this->repository      = $repository ?? new FolderRepository();
+		$this->hierarchy       = $hierarchy ?? new HierarchyValidator( $this->repository );
+		$this->policy          = $policy ?? new FolderPolicy( $this->repository );
+		$this->transitions     = $transitions ?? new TransitionService( null, $this->repository, $this->policy );
+		$this->content_folders = $content_folders;
+	}
+
+	/**
+	 * Content folder service (lazy to avoid constructor cycles).
+	 *
+	 * @return ContentFolderService
+	 */
+	private function content_folders(): ContentFolderService {
+		if ( null === $this->content_folders ) {
+			$this->content_folders = new ContentFolderService( null, $this, $this->repository );
+		}
+
+		return $this->content_folders;
 	}
 
 	/**
@@ -192,6 +216,12 @@ class FolderService {
 			return $existing;
 		}
 
+		if ( $this->content_folders()->is_mutation_locked( $folder_id ) ) {
+			// Name and parent are owned by the post lifecycle; only ACL/privacy may change.
+			$name      = (string) $existing->name;
+			$parent_id = (int) $existing->parent;
+		}
+
 		$name = sanitize_text_field( $name );
 
 		if ( '' === $name ) {
@@ -280,6 +310,14 @@ class FolderService {
 
 		if ( is_wp_error( $existing ) ) {
 			return $existing;
+		}
+
+		if ( $this->content_folders()->is_mutation_locked( $folder_id ) ) {
+			return new WP_Error(
+				'media_manager_folder_locked',
+				__( 'Managed or system folders cannot be deleted while their source exists.', 'media-manager' ),
+				[ 'status' => 409 ]
+			);
 		}
 
 		$children = $this->repository->children_of( $folder_id );

@@ -94,7 +94,10 @@ export function syncAllUploaders( folderId, frame = null ) {
 }
 
 /**
- * Bind folder updates to a media frame uploader.
+ * Bind folder updates to a media frame uploader only.
+ *
+ * Library browse filtering is handled separately via setCollectionFolder so the
+ * upload destination (e.g. a generated post folder) does not hide the grid.
  *
  * @param {Object}      frame    Media frame.
  * @param {number|null} folderId Folder selection.
@@ -106,22 +109,6 @@ export function syncFrameUploader( frame, folderId ) {
 
 	const uploader = frame.uploader?.uploader || frame.uploader;
 	setUploaderFolder( uploader, folderId );
-
-	const state = typeof frame.state === 'function' ? frame.state() : null;
-	const library =
-		state?.get?.( 'library' ) ||
-		( typeof frame.state?.get === 'function'
-			? frame.state.get( 'library' )
-			: null );
-
-	if ( library?.props?.set ) {
-		library.props.set( {
-			media_manager_folder:
-				folderId === null || typeof folderId === 'undefined'
-					? 'all'
-					: folderId,
-		} );
-	}
 }
 
 /**

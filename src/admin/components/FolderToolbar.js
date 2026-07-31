@@ -15,6 +15,7 @@ import { __ } from '@wordpress/i18n';
  * @param {Function} props.onRename     Rename handler.
  * @param {Function} props.onDelete     Delete handler.
  * @param {boolean}  props.hasSelection Whether a folder is selected.
+ * @param {boolean}  props.canDelete    Whether delete is allowed for selection.
  * @return {JSX.Element} Toolbar.
  */
 export default function FolderToolbar( {
@@ -25,8 +26,11 @@ export default function FolderToolbar( {
 	onRename,
 	onDelete,
 	hasSelection,
+	canDelete = true,
 } ) {
 	const actionsClass = hasSelection ? '' : ' is-disabled';
+	const deleteClass =
+		hasSelection && canDelete ? '' : ' is-disabled';
 
 	return (
 		<>
@@ -58,9 +62,9 @@ export default function FolderToolbar( {
 					{ capabilities.delete && (
 						<button
 							type="button"
-							className={ `media-manager-delete-folder${ actionsClass }` }
+							className={ `media-manager-delete-folder${ deleteClass }` }
 							onClick={ onDelete }
-							disabled={ ! hasSelection }
+							disabled={ ! hasSelection || ! canDelete }
 							aria-label={ __( 'Delete folder', 'media-manager' ) }
 						/>
 					) }

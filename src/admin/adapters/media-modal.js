@@ -81,7 +81,7 @@ export function subscribeToSelection(frame, callback) {
 }
 
 /**
- * Inject a lightweight folder toolbar mount into an attachment browser.
+ * Inject a full-height folder sidebar mount into an attachment browser.
  *
  * @param {Object} frame Media frame.
  * @return {HTMLElement|null} Mount element.
@@ -91,9 +91,15 @@ export function ensureModalFolderMount(frame) {
 		return null;
 	}
 
+	const frameEl = frame.$el.get?.(0) || frame.$el[0] || null;
 	const browser = frame.$el.find('.attachments-browser').get(0);
 	if (!browser) {
 		return null;
+	}
+
+	browser.classList.add('has-media-manager-folders');
+	if (frameEl) {
+		frameEl.classList.add('has-media-manager-folders');
 	}
 
 	let mount = browser.querySelector('.media-manager-modal-folders');

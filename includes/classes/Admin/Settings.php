@@ -68,12 +68,13 @@ class Settings {
 	 */
 	public static function defaults(): array {
 		return [
-			'show_count'           => true,
-			'show_search'          => true,
-			'show_list_view'       => true,
-			'show_modal_sidebar'   => true,
-			'default_folder'       => 0,
-			'private_storage_path' => '',
+			'show_count'               => true,
+			'show_search'              => true,
+			'show_list_view'           => true,
+			'show_modal_sidebar'       => true,
+			'default_folder'           => 0,
+			'private_storage_path'     => '',
+			'generated_media_folders'  => [],
 		];
 	}
 
@@ -178,6 +179,23 @@ class Settings {
 			'media-manager',
 			'media_manager_private'
 		);
+
+		add_settings_section(
+			'media_manager_generated',
+			__( 'Generated media folders', 'media-manager' ),
+			static function (): void {
+				echo '<p>' . esc_html__( 'Creates a Media Library folder per post and sends editor uploads there.', 'media-manager' ) . '</p>';
+			},
+			'media-manager'
+		);
+
+		add_settings_field(
+			'generated_media_folders',
+			__( 'Enable for post types', 'media-manager' ),
+			[ $this, 'render_generated_media_folders_field' ],
+			'media-manager',
+			'media_manager_generated'
+		);
 	}
 
 	/**
@@ -209,6 +227,20 @@ class Settings {
 		$path                           = isset( $input['private_storage_path'] ) ? trim( (string) $input['private_storage_path'] ) : '';
 		$path                           = str_replace( "\0", '', $path );
 		$output['private_storage_path'] = untrailingslashit( $path );
+
+		$enabled_types = [];
+		$raw_types     = isset( $input['generated_media_folders'] ) && is_array( $input['generated_media_folders'] )
+			? $input['generated_media_folders']
+			: [];
+		$service       = new \Eighteen73\MediaManager\ContentFolders\ContentFolderService();
+		$eligible      = $service->eligible_post_types();
+		foreach ( array_keys( $eligible ) as $post_type ) {
+			if ( ! empty( $raw_types[ $post_type ] ) ) {
+				$enabled_types[ $post_type ] = true;
+				$service->ensure_system_root( $post_type );
+			}
+		}
+		$output['generated_media_folders'] = $enabled_types;
 
 		// Keep private delivery rewrites current whenever settings are saved.
 		( new \Eighteen73\MediaManager\PrivateMedia\Delivery() )->add_rewrite_rules();
@@ -290,6 +322,39 @@ class Settings {
 			esc_attr( $class ),
 			esc_html( $health['message'] )
 		);
+	}
+
+	/**
+	 * Render generated media folder post type checkboxes.
+	 *
+	 * @return void
+	 */
+	public function render_generated_media_folders_field(): void {
+		$settings = self::get_settings();
+		$map      = isset( $settings['generated_media_folders'] ) && is_array( $settings['generated_media_folders'] )
+			? $settings['generated_media_folders']
+			: [];
+		$service  = new \Eighteen73\MediaManager\ContentFolders\ContentFolderService();
+		$types    = $service->eligible_post_types();
+
+		if ( empty( $types ) ) {
+			echo '<p class="description">' . esc_html__( 'No eligible post types found.', 'media-manager' ) . '</p>';
+			return;
+		}
+
+		echo '<fieldset>';
+		foreach ( $types as $slug => $object ) {
+			$label = $object->labels->name ?? $slug;
+			printf(
+				'<label style="display:block;margin-bottom:4px;"><input type="checkbox" name="%1$s[generated_media_folders][%2$s]" value="1" %3$s /> %4$s <code>%2$s</code></label>',
+				esc_attr( self::OPTION ),
+				esc_attr( $slug ),
+				checked( ! empty( $map[ $slug ] ), true, false ),
+				esc_html( $label )
+			);
+		}
+		echo '</fieldset>';
+		echo '<p class="description">' . esc_html__( 'Creates a Media Library folder per post and sends editor uploads there.', 'media-manager' ) . '</p>';
 	}
 
 	/**

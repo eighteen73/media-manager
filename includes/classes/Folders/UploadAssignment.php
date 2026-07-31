@@ -7,6 +7,7 @@
 
 namespace Eighteen73\MediaManager\Folders;
 
+use Eighteen73\MediaManager\ContentFolders\ContentFolderService;
 use Eighteen73\MediaManager\Permissions\AccessPolicy;
 use Eighteen73\MediaManager\Permissions\AclCache;
 use Eighteen73\MediaManager\Permissions\FolderPolicy;
@@ -65,6 +66,13 @@ class UploadAssignment {
 	private PrivateStorage $storage;
 
 	/**
+	 * Content folder service.
+	 *
+	 * @var ContentFolderService
+	 */
+	private ContentFolderService $content_folders;
+
+	/**
 	 * Attachments already assigned in this request.
 	 *
 	 * @var array<int, true>
@@ -81,12 +89,13 @@ class UploadAssignment {
 	/**
 	 * Constructor.
 	 *
-	 * @param FolderRepository|null  $repository  Optional repository.
-	 * @param AttachmentQuery|null   $queries     Optional query helper.
-	 * @param AccessPolicy|null      $access      Optional access policy.
-	 * @param FolderPolicy|null      $policy      Optional policy.
-	 * @param TransitionService|null $transitions Optional transitions.
-	 * @param PrivateStorage|null    $storage     Optional storage.
+	 * @param FolderRepository|null     $repository      Optional repository.
+	 * @param AttachmentQuery|null      $queries         Optional query helper.
+	 * @param AccessPolicy|null         $access          Optional access policy.
+	 * @param FolderPolicy|null         $policy          Optional policy.
+	 * @param TransitionService|null    $transitions     Optional transitions.
+	 * @param PrivateStorage|null       $storage         Optional storage.
+	 * @param ContentFolderService|null $content_folders Optional content folders.
 	 */
 	public function __construct(
 		?FolderRepository $repository = null,
@@ -94,14 +103,16 @@ class UploadAssignment {
 		?AccessPolicy $access = null,
 		?FolderPolicy $policy = null,
 		?TransitionService $transitions = null,
-		?PrivateStorage $storage = null
+		?PrivateStorage $storage = null,
+		?ContentFolderService $content_folders = null
 	) {
-		$this->repository  = $repository ?? new FolderRepository();
-		$this->access      = $access ?? new AccessPolicy();
-		$this->queries     = $queries ?? new AttachmentQuery( $this->repository, null, $this->access );
-		$this->policy      = $policy ?? new FolderPolicy( $this->repository );
-		$this->transitions = $transitions ?? new TransitionService( null, $this->repository, $this->policy );
-		$this->storage     = $storage ?? new PrivateStorage();
+		$this->repository      = $repository ?? new FolderRepository();
+		$this->access          = $access ?? new AccessPolicy();
+		$this->queries         = $queries ?? new AttachmentQuery( $this->repository, null, $this->access );
+		$this->policy          = $policy ?? new FolderPolicy( $this->repository );
+		$this->transitions     = $transitions ?? new TransitionService( null, $this->repository, $this->policy );
+		$this->storage         = $storage ?? new PrivateStorage();
+		$this->content_folders = $content_folders ?? new ContentFolderService( null, null, $this->repository );
 	}
 
 	/**
@@ -122,7 +133,7 @@ class UploadAssignment {
 	 * @return array
 	 */
 	public function filter_upload_dir( array $uploads ): array {
-		$folder_id = $this->folder_from_request();
+		$folder_id = $this->resolve_upload_folder();
 
 		if ( null === $folder_id || $folder_id < 1 ) {
 			return $uploads;
@@ -172,7 +183,7 @@ class UploadAssignment {
 	 * @return void
 	 */
 	public function on_add_attachment( int $attachment_id ): void {
-		$folder_id = $this->folder_from_request();
+		$folder_id = $this->resolve_upload_folder();
 
 		if ( null === $folder_id || $folder_id < 1 ) {
 			return;
@@ -197,11 +208,17 @@ class UploadAssignment {
 		$raw       = $request->get_param( 'media_manager_folder' );
 		$selection = $this->queries->selection_from_request( $raw );
 
-		if ( is_wp_error( $selection ) || null === $selection || $selection < 1 ) {
+		if ( ! is_wp_error( $selection ) && null !== $selection && $selection > 0 ) {
+			$this->assign_from_request( (int) $attachment->ID, (int) $selection );
 			return;
 		}
 
-		$this->assign_from_request( (int) $attachment->ID, (int) $selection );
+		$folder_id = $this->folder_from_post_context( $request );
+		if ( null === $folder_id || $folder_id < 1 ) {
+			return;
+		}
+
+		$this->assign_from_request( (int) $attachment->ID, $folder_id );
 	}
 
 	/**
@@ -260,6 +277,20 @@ class UploadAssignment {
 	}
 
 	/**
+	 * Resolve the upload target folder (explicit request param, else post context).
+	 *
+	 * @return int|null
+	 */
+	private function resolve_upload_folder() {
+		$from_request = $this->folder_from_request();
+		if ( null !== $from_request && $from_request > 0 ) {
+			return $from_request;
+		}
+
+		return $this->folder_from_post_context();
+	}
+
+	/**
 	 * Read folder ID from the current request.
 	 *
 	 * @return int|null
@@ -286,5 +317,41 @@ class UploadAssignment {
 		}
 
 		return $folder_id;
+	}
+
+	/**
+	 * Resolve a generated folder from the post being edited.
+	 *
+	 * @param \WP_REST_Request|null $request Optional REST request.
+	 * @return int|null
+	 */
+	private function folder_from_post_context( $request = null ) {
+		$post_id = 0;
+
+		if ( $request instanceof \WP_REST_Request ) {
+			$post_id = absint( $request->get_param( 'post' ) );
+			if ( $post_id < 1 ) {
+				$post_id = absint( $request->get_param( 'post_id' ) );
+			}
+		}
+
+		if ( $post_id < 1 && isset( $_REQUEST['post_id'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$post_id = absint( wp_unslash( $_REQUEST['post_id'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		}
+
+		if ( $post_id < 1 && isset( $_REQUEST['post'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$post_id = absint( wp_unslash( $_REQUEST['post'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		}
+
+		if ( $post_id < 1 || ! $this->content_folders->is_enabled_for_post( $post_id ) ) {
+			return null;
+		}
+
+		$folder = $this->content_folders->ensure_post_folder( $post_id );
+		if ( is_wp_error( $folder ) ) {
+			return null;
+		}
+
+		return (int) $folder->term_id;
 	}
 }

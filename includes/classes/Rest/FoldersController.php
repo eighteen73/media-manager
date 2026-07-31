@@ -425,17 +425,21 @@ class FoldersController extends WP_REST_Controller {
 	private function prepare_folder( WP_Term $term ): array {
 		$policy = $this->policy->get( (int) $term->term_id );
 		$policy = is_wp_error( $policy ) ? $this->policy->defaults() : $policy;
+		$flags  = ( new \Eighteen73\MediaManager\ContentFolders\ContentFolderRepository() )->flags( (int) $term->term_id );
 
-		return [
-			'id'                => (int) $term->term_id,
-			'name'              => $term->name,
-			'parent'            => (int) $term->parent,
-			'count'             => (int) $term->count,
-			'access_mode'       => $policy['access_mode'],
-			'allowed_roles'     => $policy['allowed_roles'],
-			'allowed_users'     => $policy['allowed_users'],
-			'allowed_usernames' => $this->policy->user_ids_to_logins( $policy['allowed_users'] ),
-			'is_private'        => $policy['is_private'],
-		];
+		return array_merge(
+			[
+				'id'                => (int) $term->term_id,
+				'name'              => $term->name,
+				'parent'            => (int) $term->parent,
+				'count'             => (int) $term->count,
+				'access_mode'       => $policy['access_mode'],
+				'allowed_roles'     => $policy['allowed_roles'],
+				'allowed_users'     => $policy['allowed_users'],
+				'allowed_usernames' => $this->policy->user_ids_to_logins( $policy['allowed_users'] ),
+				'is_private'        => $policy['is_private'],
+			],
+			$flags
+		);
 	}
 }

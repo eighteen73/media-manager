@@ -168,6 +168,27 @@ class Assets {
 		}
 
 		$storage = new \Eighteen73\MediaManager\PrivateMedia\StorageConfig();
+		$post_id = $this->resolve_current_post_id();
+		$post_type = '';
+		$generated_folder_id = null;
+
+		if ( $post_id > 0 ) {
+			$post = get_post( $post_id );
+			if ( $post instanceof \WP_Post ) {
+				$post_type = $post->post_type;
+				$content   = new \Eighteen73\MediaManager\ContentFolders\ContentFolderService();
+				if ( $content->is_enabled_for_type( $post_type ) ) {
+					$folder_id = $content->folder_id_for_post( $post_id );
+					if ( $folder_id < 1 ) {
+						$ensured = $content->ensure_post_folder( $post_id );
+						if ( ! is_wp_error( $ensured ) ) {
+							$folder_id = (int) $ensured->term_id;
+						}
+					}
+					$generated_folder_id = $folder_id > 0 ? $folder_id : null;
+				}
+			}
+		}
 
 		return [
 			'restUrl'               => esc_url_raw( rest_url( 'media-manager/v1' ) ),
@@ -184,6 +205,9 @@ class Assets {
 			],
 			'roles'                 => $roles,
 			'currentUserId'         => get_current_user_id(),
+			'currentPostId'         => $post_id > 0 ? $post_id : null,
+			'currentPostType'       => $post_type !== '' ? $post_type : null,
+			'generatedFolderId'     => $generated_folder_id,
 			'privateStorageReady'   => $storage->is_ready(),
 			'privateStorageMessage' => $storage->health()['message'],
 			'defaultFolder'         => $default > 0 ? $default : null,
@@ -212,5 +236,31 @@ class Assets {
 				),
 			],
 		];
+	}
+
+	/**
+	 * Resolve the post being edited in the current admin/media context.
+	 *
+	 * @return int
+	 */
+	private function resolve_current_post_id(): int {
+		$post_id = 0;
+
+		if ( isset( $_GET['post'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$post_id = absint( wp_unslash( $_GET['post'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		}
+
+		if ( $post_id < 1 && isset( $_REQUEST['post_id'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$post_id = absint( wp_unslash( $_REQUEST['post_id'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		}
+
+		if ( $post_id < 1 ) {
+			$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+			if ( $screen && isset( $screen->base ) && 'post' === $screen->base && isset( $_GET['post'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+				$post_id = absint( wp_unslash( $_GET['post'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			}
+		}
+
+		return $post_id;
 	}
 }

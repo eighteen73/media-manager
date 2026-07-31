@@ -68,15 +68,18 @@ body.media-manager-folders-active.upload-php
 }
 
 .media-manager-sidebar.is-compact {
+	position: static;
+	top: auto;
 	width: 100%;
 	max-width: none;
 	min-width: 0;
-	max-height: 240px;
-	overflow: auto;
+	height: 100%;
+	max-height: none;
+	overflow: visible;
 	margin: 0;
-	padding: 8px 12px;
-	background: #f6f7f7;
-	border-right: 1px solid #dcdcde;
+	padding: 0;
+	background: transparent;
+	border-right: 0;
 }
 
 .media-manager-sidebar__header {
@@ -239,6 +242,12 @@ body.media-manager-folders-active.upload-php
 	margin: 0;
 }
 
+.media-manager-folders-toplevel li.media-manager-folders-li--section-start {
+	margin-top: 10px;
+	padding-top: 10px;
+	border-top: 1px solid #dcdcde;
+}
+
 .media-manager-folder-nav {
 	padding: 0 11px 0 36px;
 	min-height: 32px;
@@ -307,6 +316,12 @@ body.media-manager-folders-active.upload-php
 .media-manager-folder-nav.is-current::before {
 	content: "\f18f";
 	color: #2271b1;
+}
+
+// System roots + generated post folders share the post icon (not folder).
+.media-manager-folder-nav--post::before,
+.media-manager-folder-nav--post.is-current::before {
+	content: "\f109";
 }
 
 .media-manager-folder-nav.is-drop-target,
@@ -436,12 +451,18 @@ body.media-manager-folders-active.upload-php
 	border-radius: 8px;
 	position: fixed;
 	background: #fff;
-	z-index: 100100;
+	/* Above core .media-modal (160000) so folder CRUD works inside wp.media. */
+	z-index: 170000;
 	left: 50%;
 	top: 50%;
 	transform: translate(-50%, -50%);
 	width: 50%;
 	max-width: 500px;
+}
+
+.wp-customizer .media-manager-modal {
+	/* Above .wp-customizer .media-modal (560000). */
+	z-index: 570000;
 }
 
 .media-manager-modal__topbar {
@@ -551,14 +572,92 @@ body.media-manager-folders-active.upload-php
 	min-height: 360px;
 	background: #000;
 	opacity: 0.5;
-	z-index: 100050;
+	/* Above core .media-modal-backdrop (159900), below .media-manager-modal. */
+	z-index: 169900;
 	border: 0;
 	padding: 0;
 	cursor: default;
 }
 
-.media-manager-modal-folders {
-	padding: 8px 12px 0;
+.wp-customizer .media-manager-modal-backdrop {
+	z-index: 569900;
+}
+
+/* Modal Media Library: full-height left folder column (Rudrastyh/FileBird-style). */
+$mm-modal-sidebar-width: 280px;
+
+.media-modal .media-manager-modal-folders,
+.media-frame .media-manager-modal-folders {
+	box-sizing: border-box;
+	position: absolute;
+	top: 0;
+	left: 0;
+	bottom: 0;
+	width: $mm-modal-sidebar-width;
+	padding: 8px 12px;
+	background: #f6f7f7;
+	border-right: 1px solid #dcdcde;
+	overflow: auto;
+	-webkit-overflow-scrolling: touch;
+	z-index: 75;
+}
+
+.media-modal .attachments-browser.has-media-manager-folders .media-toolbar,
+.media-modal .attachments-browser.has-media-manager-folders .uploader-inline,
+.media-modal
+	.attachments-browser.has-media-manager-folders.has-load-more
+	.attachments-wrapper,
+.media-modal
+	.attachments-browser.has-media-manager-folders:not(.has-load-more)
+	.attachments,
+.media-frame .attachments-browser.has-media-manager-folders .media-toolbar,
+.media-frame .attachments-browser.has-media-manager-folders .uploader-inline,
+.media-frame
+	.attachments-browser.has-media-manager-folders.has-load-more
+	.attachments-wrapper,
+.media-frame
+	.attachments-browser.has-media-manager-folders:not(.has-load-more)
+	.attachments,
+.media-modal .attachments-browser:has(> .media-manager-modal-folders) .media-toolbar,
+.media-modal .attachments-browser:has(> .media-manager-modal-folders) .uploader-inline,
+.media-modal
+	.attachments-browser:has(> .media-manager-modal-folders).has-load-more
+	.attachments-wrapper,
+.media-modal
+	.attachments-browser:has(> .media-manager-modal-folders):not(.has-load-more)
+	.attachments,
+.media-frame .attachments-browser:has(> .media-manager-modal-folders) .media-toolbar,
+.media-frame .attachments-browser:has(> .media-manager-modal-folders) .uploader-inline,
+.media-frame
+	.attachments-browser:has(> .media-manager-modal-folders).has-load-more
+	.attachments-wrapper,
+.media-frame
+	.attachments-browser:has(> .media-manager-modal-folders):not(.has-load-more)
+	.attachments {
+	left: $mm-modal-sidebar-width;
+}
+
+.media-modal .media-frame.has-media-manager-folders .media-frame-router,
+.media-frame.has-media-manager-folders .media-frame-router,
+.media-modal .media-frame:has(.media-manager-modal-folders) .media-frame-router,
+.media-frame:has(.media-manager-modal-folders) .media-frame-router {
+	left: $mm-modal-sidebar-width;
+}
+
+.media-modal .media-manager-modal-folders .media-manager-sidebar__header,
+.media-frame .media-manager-modal-folders .media-manager-sidebar__header {
+	padding-top: 4px;
+}
+
+.media-modal .media-manager-modal-folders .media-manager-sidebar__header .wp-heading-inline,
+.media-frame .media-manager-modal-folders .media-manager-sidebar__header .wp-heading-inline {
+	font-size: 16px;
+}
+
+.media-modal .media-manager-modal-folders .media-manager-sidebar__toolbar,
+.media-frame .media-manager-modal-folders .media-manager-sidebar__toolbar {
+	height: 40px;
+	margin-bottom: 10px;
 }
 
 @media screen and (max-width: 782px) {
