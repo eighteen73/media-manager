@@ -252,22 +252,32 @@ class Assets {
 	 * @return array<string, mixed>
 	 */
 	private function get_shared_media_boot_data(): array {
-		$is_multisite   = is_multisite();
-		$library_id     = NetworkLibrary::get_library_id();
-		$is_enabled     = NetworkLibrary::is_enabled();
-		$is_allowed     = NetworkLibrary::is_allowed_for_blog();
-		$can_shared     = $this->access->can_use_shared_media();
-		$is_library     = NetworkLibrary::is_library_site();
-		$enabled        = $is_multisite
+		$is_multisite = is_multisite();
+		$is_enabled   = NetworkLibrary::is_enabled();
+		$is_allowed   = NetworkLibrary::is_allowed_for_blog();
+		$can_shared   = $this->access->can_use_shared_media();
+		$is_library   = NetworkLibrary::is_library_site();
+		$enabled      = $is_multisite
 			&& $is_enabled
 			&& $is_allowed
 			&& $can_shared
 			&& ! $is_library;
 
+		$post_id             = $this->resolve_current_post_id();
+		$featured_is_network = false;
+		if ( $post_id > 0 ) {
+			$featured_is_network = (bool) get_post_meta(
+				$post_id,
+				\Eighteen73\MediaManager\SharedMedia\AttachmentResolver::META_FEATURED_NETWORK,
+				true
+			);
+		}
+
 		return [
-			'enabled'          => $enabled,
-			'networkLibraryId' => NetworkLibrary::get_library_id(),
-			'tabTitle'         => NetworkLibrary::tab_title(),
+			'enabled'           => $enabled,
+			'networkLibraryId'  => NetworkLibrary::get_library_id(),
+			'tabTitle'          => NetworkLibrary::tab_title(),
+			'featuredIsNetwork' => $featured_is_network,
 		];
 	}
 

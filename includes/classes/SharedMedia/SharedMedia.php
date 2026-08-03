@@ -81,6 +81,33 @@ class SharedMedia {
 		add_filter( 'rest_request_before_callbacks', [ $this, 'maybe_prime_featured_media' ], 10, 3 );
 		add_action( 'wp_ajax_get-attachment', [ $this, 'maybe_ajax_get_attachment' ], 0 );
 		add_action( 'wp_ajax_set-post-thumbnail', [ $this, 'maybe_prime_ajax_thumbnail' ], 0 );
+		add_filter( 'media_view_settings', [ $this, 'filter_media_view_settings' ], 10, 2 );
+	}
+
+	/**
+	 * Expose whether the current post's featured image is from the network library.
+	 *
+	 * @param array         $settings Media view settings.
+	 * @param \WP_Post|null $post     Current post.
+	 * @return array
+	 */
+	public function filter_media_view_settings( $settings, $post ) {
+		if ( ! is_array( $settings ) ) {
+			return $settings;
+		}
+
+		$featured_network = false;
+		if ( $post instanceof \WP_Post ) {
+			$featured_network = (bool) get_post_meta(
+				(int) $post->ID,
+				AttachmentResolver::META_FEATURED_NETWORK,
+				true
+			);
+		}
+
+		$settings['mediaManagerFeaturedNetwork'] = $featured_network;
+
+		return $settings;
 	}
 
 	/**

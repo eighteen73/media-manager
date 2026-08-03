@@ -21,7 +21,6 @@ export function observeMediaFrames({ onFrame }) {
 
 	wp.media.view.Modal = OriginalModal.extend({
 		open() {
-			const result = OriginalModal.prototype.open.apply(this, arguments);
 			if (active && this?.options?.controller) {
 				const frame = this.options.controller;
 				if (!observedFrames.has(frame)) {
@@ -29,7 +28,7 @@ export function observeMediaFrames({ onFrame }) {
 					onFrame(frame);
 				}
 			}
-			return result;
+			return OriginalModal.prototype.open.apply(this, arguments);
 		},
 	});
 
