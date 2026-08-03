@@ -252,9 +252,8 @@ class Settings {
 		foreach ( $types as $slug => $object ) {
 			$label = $object->labels->name ?? $slug;
 			printf(
-				'<label style="display:block;margin-bottom:4px;"><input type="checkbox" name="%1$s[generated_media_folders][%2$s]" value="1" %3$s /> %4$s <code>%2$s</code></label>',
+				'<label style="display:block;margin-bottom:4px;"><input type="checkbox" name="%1$s[generated_media_folders][%2$s]" value="1" %3$s /> %3$s</label>',
 				esc_attr( self::OPTION ),
-				esc_attr( $slug ),
 				checked( ! empty( $map[ $slug ] ), true, false ),
 				esc_html( $label )
 			);
