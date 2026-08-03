@@ -82,6 +82,16 @@ class AccessPolicy {
 	}
 
 	/**
+	 * Whether the user can use shared network media.
+	 *
+	 * @param int $user_id Optional user ID. Defaults to current user.
+	 * @return bool
+	 */
+	public function can_use_shared_media( int $user_id = 0 ): bool {
+		return $this->user_can( Capabilities::SHARED, $user_id );
+	}
+
+	/**
 	 * Whether the user can access a specific folder.
 	 *
 	 * @param int $folder_id Folder ID.

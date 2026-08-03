@@ -1,0 +1,205 @@
+<?php
+/**
+ * Shared network media tests.
+ *
+ * @package Eighteen73\MediaManager
+ */
+
+use Eighteen73\MediaManager\Admin\NetworkSettings;
+use Eighteen73\MediaManager\Install\Installer;
+use Eighteen73\MediaManager\SharedMedia\NetworkLibrary;
+
+/**
+ * Tests for network library settings and resolver filters.
+ */
+class Test_Shared_Network_Media extends WP_UnitTestCase {
+
+	/**
+	 * Setup.
+	 *
+	 * @return void
+	 */
+	public function set_up() {
+		parent::set_up();
+		Installer::activate();
+		delete_site_option( NetworkLibrary::OPTION );
+		remove_all_filters( 'media_manager_network_library_id' );
+		remove_all_filters( 'media_manager_network_library_allowed' );
+		remove_all_filters( 'media_manager_shared_media_tab_title' );
+	}
+
+	/**
+	 * Tear down.
+	 *
+	 * @return void
+	 */
+	public function tear_down() {
+		delete_site_option( NetworkLibrary::OPTION );
+		remove_all_filters( 'media_manager_network_library_id' );
+		remove_all_filters( 'media_manager_network_library_allowed' );
+		remove_all_filters( 'media_manager_shared_media_tab_title' );
+		parent::tear_down();
+	}
+
+	/**
+	 * Shared media is disabled by default (no library selected).
+	 *
+	 * @return void
+	 */
+	public function test_disabled_by_default() {
+		$this->assertSame( 0, NetworkLibrary::get_library_id() );
+		$this->assertFalse( NetworkLibrary::is_enabled() );
+		$this->assertFalse( NetworkLibrary::is_allowed_for_blog() );
+		$this->assertFalse( NetworkLibrary::current_user_can_use() );
+	}
+
+	/**
+	 * Saving a valid site ID enables the network library.
+	 *
+	 * @return void
+	 */
+	public function test_update_library_id_enables_shared_media() {
+		if ( ! is_multisite() ) {
+			$this->markTestSkipped( 'Multisite required.' );
+		}
+
+		$blog_id = self::factory()->blog->create();
+		$stored  = NetworkLibrary::update_library_id( (int) $blog_id );
+
+		$this->assertSame( (int) $blog_id, $stored );
+		$this->assertSame( (int) $blog_id, NetworkLibrary::get_library_id() );
+		$this->assertTrue( NetworkLibrary::is_enabled() );
+	}
+
+	/**
+	 * Invalid site IDs are stored as disabled (0).
+	 *
+	 * @return void
+	 */
+	public function test_update_library_id_rejects_invalid_site() {
+		if ( ! is_multisite() ) {
+			$this->markTestSkipped( 'Multisite required.' );
+		}
+
+		$stored = NetworkLibrary::update_library_id( 999999 );
+		$this->assertSame( 0, $stored );
+		$this->assertFalse( NetworkLibrary::is_enabled() );
+	}
+
+	/**
+	 * Filter can override the configured library ID.
+	 *
+	 * @return void
+	 */
+	public function test_network_library_id_filter() {
+		if ( ! is_multisite() ) {
+			$this->markTestSkipped( 'Multisite required.' );
+		}
+
+		$blog_id = self::factory()->blog->create();
+		NetworkLibrary::update_library_id( (int) $blog_id );
+
+		add_filter( 'media_manager_network_library_id', '__return_zero' );
+
+		$this->assertSame( 0, NetworkLibrary::get_library_id() );
+		$this->assertFalse( NetworkLibrary::is_enabled() );
+	}
+
+	/**
+	 * Filter can deny access from a specific blog.
+	 *
+	 * @return void
+	 */
+	public function test_network_library_allowed_filter() {
+		if ( ! is_multisite() ) {
+			$this->markTestSkipped( 'Multisite required.' );
+		}
+
+		$library_id = self::factory()->blog->create();
+		$denied_id  = self::factory()->blog->create();
+		NetworkLibrary::update_library_id( (int) $library_id );
+
+		add_filter(
+			'media_manager_network_library_allowed',
+			static function ( $allowed, $blog_id ) use ( $denied_id ) {
+				if ( (int) $blog_id === (int) $denied_id ) {
+					return false;
+				}
+				return $allowed;
+			},
+			10,
+			2
+		);
+
+		$this->assertTrue( NetworkLibrary::is_allowed_for_blog( get_current_blog_id() ) );
+		$this->assertFalse( NetworkLibrary::is_allowed_for_blog( (int) $denied_id ) );
+	}
+
+	/**
+	 * Tab title filter changes the shared media label.
+	 *
+	 * @return void
+	 */
+	public function test_shared_media_tab_title_filter() {
+		add_filter(
+			'media_manager_shared_media_tab_title',
+			static function () {
+				return 'Network library';
+			}
+		);
+
+		$this->assertSame( 'Network library', NetworkLibrary::tab_title() );
+	}
+
+	/**
+	 * current_user_can_use requires enabled library, allowed blog, and SHARED cap.
+	 *
+	 * @return void
+	 */
+	public function test_current_user_can_use_requires_cap_and_config() {
+		if ( ! is_multisite() ) {
+			$this->markTestSkipped( 'Multisite required.' );
+		}
+
+		$library_id = self::factory()->blog->create();
+		$user_id    = self::factory()->user->create( [ 'role' => 'editor' ] );
+
+		wp_set_current_user( $user_id );
+		$this->assertFalse( NetworkLibrary::current_user_can_use() );
+
+		NetworkLibrary::update_library_id( (int) $library_id );
+		$this->assertTrue( NetworkLibrary::current_user_can_use( $user_id ) );
+
+		$subscriber = self::factory()->user->create( [ 'role' => 'subscriber' ] );
+		$this->assertFalse( NetworkLibrary::current_user_can_use( $subscriber ) );
+	}
+
+	/**
+	 * Network settings page registers under network admin settings.
+	 *
+	 * @return void
+	 */
+	public function test_network_settings_page_registers() {
+		if ( ! is_multisite() ) {
+			$this->markTestSkipped( 'Multisite required.' );
+		}
+
+		global $submenu;
+		$submenu = []; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+
+		( new NetworkSettings() )->register();
+		do_action( 'network_admin_menu' );
+
+		$found = false;
+		if ( ! empty( $submenu['settings.php'] ) ) {
+			foreach ( $submenu['settings.php'] as $item ) {
+				if ( isset( $item[2] ) && NetworkSettings::PAGE === $item[2] ) {
+					$found = true;
+					break;
+				}
+			}
+		}
+
+		$this->assertTrue( $found, 'Network Media submenu should be registered under settings.php.' );
+	}
+}

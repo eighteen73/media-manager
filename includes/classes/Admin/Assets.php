@@ -10,6 +10,7 @@ namespace Eighteen73\MediaManager\Admin;
 use Eighteen73\MediaManager\Install\Installer;
 use Eighteen73\MediaManager\Permissions\AccessPolicy;
 use Eighteen73\MediaManager\Rest\PreferencesController;
+use Eighteen73\MediaManager\SharedMedia\NetworkLibrary;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -51,13 +52,15 @@ class Assets {
 	 * @return void
 	 */
 	public function enqueue( string $hook_suffix ): void {
-		if ( ! $this->access->can_view_folders() ) {
+		$can_view = $this->access->can_view_folders();
+		$media_screens = [ 'upload.php', 'media-new.php' ];
+		$is_media_screen = in_array( $hook_suffix, $media_screens, true );
+
+		if ( ! $can_view ) {
 			return;
 		}
 
-		$media_screens = [ 'upload.php', 'media-new.php' ];
-
-		if ( ! in_array( $hook_suffix, $media_screens, true ) ) {
+		if ( ! $is_media_screen ) {
 			return;
 		}
 
@@ -70,7 +73,10 @@ class Assets {
 	 * @return void
 	 */
 	public function enqueue_media_assets(): void {
-		if ( ! is_admin() || ! $this->access->can_view_folders() ) {
+		$is_admin = is_admin();
+		$can_view = $this->access->can_view_folders();
+
+		if ( ! $is_admin || ! $can_view ) {
 			return;
 		}
 
@@ -167,9 +173,9 @@ class Assets {
 			];
 		}
 
-		$storage = new \Eighteen73\MediaManager\PrivateMedia\StorageConfig();
-		$post_id = $this->resolve_current_post_id();
-		$post_type = '';
+		$storage             = new \Eighteen73\MediaManager\PrivateMedia\StorageConfig();
+		$post_id             = $this->resolve_current_post_id();
+		$post_type           = '';
 		$generated_folder_id = null;
 
 		if ( $post_id > 0 ) {
@@ -202,6 +208,7 @@ class Assets {
 				'assign'   => $this->access->can_assign_folders(),
 				'settings' => $this->access->can_manage_settings(),
 				'private'  => $this->access->can_manage_private_folders(),
+				'shared'   => $this->access->can_use_shared_media(),
 			],
 			'roles'                 => $roles,
 			'currentUserId'         => get_current_user_id(),
@@ -211,6 +218,7 @@ class Assets {
 			'privateStorageReady'   => $storage->is_ready(),
 			'privateStorageMessage' => $storage->health()['message'],
 			'defaultFolder'         => $default > 0 ? $default : null,
+			'sharedMedia'           => $this->get_shared_media_boot_data(),
 			'strings'               => [
 				'allMedia'            => __( 'All files', 'media-manager' ),
 				'uncategorized'       => __( 'Uncategorized', 'media-manager' ),
@@ -235,6 +243,31 @@ class Assets {
 					'media-manager'
 				),
 			],
+		];
+	}
+
+	/**
+	 * Shared media boot payload for the media modal.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function get_shared_media_boot_data(): array {
+		$is_multisite   = is_multisite();
+		$library_id     = NetworkLibrary::get_library_id();
+		$is_enabled     = NetworkLibrary::is_enabled();
+		$is_allowed     = NetworkLibrary::is_allowed_for_blog();
+		$can_shared     = $this->access->can_use_shared_media();
+		$is_library     = NetworkLibrary::is_library_site();
+		$enabled        = $is_multisite
+			&& $is_enabled
+			&& $is_allowed
+			&& $can_shared
+			&& ! $is_library;
+
+		return [
+			'enabled'          => $enabled,
+			'networkLibraryId' => NetworkLibrary::get_library_id(),
+			'tabTitle'         => NetworkLibrary::tab_title(),
 		];
 	}
 

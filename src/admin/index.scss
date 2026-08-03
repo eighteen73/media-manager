@@ -648,9 +648,9 @@ $mm-modal-sidebar-width: 280px;
 	left: $mm-modal-sidebar-width;
 }
 
-.media-modal .media-manager-modal-folders .media-manager-sidebar__header,
-.media-frame .media-manager-modal-folders .media-manager-sidebar__header {
-	padding-top: 4px;
+.media-modal .attachments-browser.media-manager-shared-browser .uploader-inline,
+.media-frame .attachments-browser.media-manager-shared-browser .uploader-inline {
+	display: none !important;
 }
 
 .media-modal .media-manager-modal-folders .media-manager-sidebar__header .wp-heading-inline,

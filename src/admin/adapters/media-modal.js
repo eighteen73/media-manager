@@ -86,13 +86,40 @@ export function subscribeToSelection(frame, callback) {
  * @param {Object} frame Media frame.
  * @return {HTMLElement|null} Mount element.
  */
-export function ensureModalFolderMount(frame) {
+/**
+ * Inject a full-height folder sidebar mount into an attachment browser.
+ *
+ * @param {Object}      frame       Media frame.
+ * @param {Object|null} browserView Optional AttachmentsBrowser from content:create.
+ * @return {HTMLElement|null} Mount element.
+ */
+export function ensureModalFolderMount(frame, browserView = null) {
 	if (!frame?.$el) {
 		return null;
 	}
 
 	const frameEl = frame.$el.get?.(0) || frame.$el[0] || null;
-	const browser = frame.$el.find('.attachments-browser').get(0);
+	let browser = frame.$el.find('.attachments-browser').get(0);
+
+	// During content:create the browser view exists but is not in the frame DOM yet.
+	if (!browser && browserView) {
+		if (browserView.el?.classList?.contains('attachments-browser')) {
+			browser = browserView.el;
+		} else if (browserView.$el?.length) {
+			browser =
+				browserView.$el.filter('.attachments-browser').get(0) ||
+				browserView.$el.find('.attachments-browser').get(0) ||
+				null;
+		}
+	}
+
+	if (!browser) {
+		const view = frame.content?.get?.() || null;
+		if (view?.el?.classList?.contains('attachments-browser')) {
+			browser = view.el;
+		}
+	}
+
 	if (!browser) {
 		return null;
 	}

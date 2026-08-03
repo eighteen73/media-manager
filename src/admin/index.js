@@ -7,6 +7,7 @@ import { dispatch, select } from '@wordpress/data';
 import './index.scss';
 import { registerStore, STORE_NAME } from './store';
 import FolderSidebar from './components/FolderSidebar';
+import SharedFolderSidebar from './components/SharedFolderSidebar';
 import {
 	mountMediaLibrarySidebar,
 	observeLibraryCollection,
@@ -16,6 +17,10 @@ import {
 	subscribeToSelection,
 	ensureModalFolderMount,
 } from './adapters/media-modal';
+import {
+	registerSharedMediaTab,
+	isSharedMediaState,
+} from './adapters/shared-media';
 import { enableFolderDragDrop } from './adapters/drag-drop';
 import { mountUploadFolderSelects } from './adapters/uploader';
 
@@ -82,6 +87,7 @@ function bootstrapModals() {
 				let unsubscribe = null;
 				let mountEl = null;
 				let retryTimer = null;
+				let sharedMode = false;
 
 				const cleanupMount = () => {
 					if ( retryTimer ) {
@@ -109,25 +115,46 @@ function bootstrapModals() {
 						?.classList.remove( 'has-media-manager-folders' );
 				};
 
-				const mount = () => {
-					const el = ensureModalFolderMount( frame );
+				const renderSidebar = ( eventArg ) => {
+					let pendingView = null;
+					if ( eventArg && typeof eventArg === 'object' ) {
+						if ( eventArg.view?.el || eventArg.view?.$el ) {
+							// content:create payload `{ view }`.
+							pendingView = eventArg.view;
+						} else if (
+							eventArg.el?.classList?.contains(
+								'attachments-browser'
+							)
+						) {
+							// content:render / activate may pass the browser view.
+							pendingView = eventArg;
+						}
+					}
+					const el = ensureModalFolderMount( frame, pendingView );
 					if ( ! el ) {
-						// Browse mode can fire render before AttachmentsBrowser is in the DOM.
 						if ( ! retryTimer ) {
 							retryTimer = window.setTimeout( () => {
 								retryTimer = null;
-								mount();
+								renderSidebar();
 							}, 50 );
 						}
 						return;
 					}
 
-					// Same browser node already hosting the sidebar.
-					if ( el === mountEl && el.dataset.mounted === '1' ) {
+					const state =
+						typeof frame.state === 'function' ? frame.state() : null;
+					const nextShared = isSharedMediaState( state );
+
+					// Same browser node already hosting the matching sidebar mode.
+					if (
+						el === mountEl &&
+						el.dataset.mounted === '1' &&
+						reactRoot &&
+						nextShared === sharedMode
+					) {
 						return;
 					}
 
-					// Browser was recreated (tab switch) — replace the previous root.
 					if ( reactRoot && el !== mountEl ) {
 						reactRoot.unmount();
 						reactRoot = null;
@@ -139,23 +166,30 @@ function bootstrapModals() {
 
 					mountEl = el;
 					el.dataset.mounted = '1';
+					sharedMode = nextShared;
 
 					if ( ! reactRoot ) {
 						reactRoot = createRoot( el );
 					}
 
-					const library =
-						typeof frame.state === 'function'
-							? frame.state()?.get?.( 'library' )
-							: frame.state?.get?.( 'library' );
+					const library = state?.get?.( 'library' ) || null;
 
-					reactRoot.render(
-						<FolderSidebar
-							collection={ library }
-							frame={ frame }
-							compact
-						/>
-					);
+					if ( sharedMode ) {
+						reactRoot.render(
+							<SharedFolderSidebar
+								collection={ library }
+								frame={ frame }
+							/>
+						);
+					} else {
+						reactRoot.render(
+							<FolderSidebar
+								collection={ library }
+								frame={ frame }
+								compact
+							/>
+						);
+					}
 
 					if ( ! unsubscribe ) {
 						unsubscribe = subscribeToSelection( frame, ( ids ) => {
@@ -166,15 +200,18 @@ function bootstrapModals() {
 					}
 				};
 
-				frame.on?.( 'ready', mount );
-				// activate fires after the browse view is in the DOM; render can be too early.
-				frame.on?.( 'content:activate:browse', mount );
-				frame.on?.( 'content:render:browse', mount );
-				frame.on?.( 'content:create:browse', mount );
+				frame.on?.( 'ready', renderSidebar );
+				frame.on?.( 'content:activate:browse', renderSidebar );
+				frame.on?.( 'content:render:browse', renderSidebar );
+				frame.on?.( 'content:create:browse', renderSidebar );
+				frame.on?.( 'content:activate:media-manager-shared', renderSidebar );
+				frame.on?.( 'content:render:media-manager-shared', renderSidebar );
+				frame.on?.( 'content:create:media-manager-shared', renderSidebar );
 				frame.on?.( 'content:render:upload', cleanupMount );
 				frame.on?.( 'content:activate:upload', cleanupMount );
 				frame.on?.( 'close', cleanupMount );
-				mount();
+				frame.on?.( 'activate', renderSidebar );
+				renderSidebar();
 			},
 		} )
 	);
@@ -238,6 +275,7 @@ function bootWhenReady() {
 	}
 	booted = true;
 
+	teardowns.push( registerSharedMediaTab() );
 	bootstrapModals();
 	bootstrapUploadFolderSelect();
 	teardowns.push( enableFolderDragDrop() );

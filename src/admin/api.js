@@ -20,6 +20,19 @@ export async function fetchFolders(recursiveCounts = true) {
 }
 
 /**
+ * Fetch the network library folder tree (Shared media tab).
+ *
+ * @param {boolean} recursiveCounts Whether counts include descendants.
+ * @return {Promise<Object>} Tree response.
+ */
+export async function fetchSharedFolders(recursiveCounts = true) {
+	const query = recursiveCounts
+		? '?recursive_counts=true'
+		: '?recursive_counts=false';
+	return apiFetch({ path: `${ROOT}/shared-folders${query}` });
+}
+
+/**
  * Create a folder.
  *
  * @param {Object} data Folder data.
