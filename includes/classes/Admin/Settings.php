@@ -139,7 +139,7 @@ class Settings {
 			'media_manager_private',
 			__( 'Private storage', 'media-manager' ),
 			static function (): void {
-				echo '<p>' . esc_html__( 'Private folders store files outside the public web root. Configure an absolute writable path that is not inside ABSPATH or uploads.', 'media-manager' ) . '</p>';
+				echo '<p>' . esc_html__( 'Private folders store files outside the public web root. Leave blank to use the site default private directory, or set an absolute writable path outside ABSPATH and uploads.', 'media-manager' ) . '</p>';
 			},
 			'media'
 		);
@@ -211,16 +211,19 @@ class Settings {
 	 * @return void
 	 */
 	public function render_private_storage_field(): void {
-		$settings = self::get_settings();
-		$path     = (string) $settings['private_storage_path'];
-		$health   = ( new StorageConfig() )->health();
+		$settings     = self::get_settings();
+		$path         = (string) $settings['private_storage_path'];
+		$default_path = StorageConfig::default_path();
+		$health       = ( new StorageConfig() )->health();
 
 		printf(
 			'<input type="text" class="large-text code" name="%1$s[private_storage_path]" value="%2$s" placeholder="%3$s" />',
 			esc_attr( self::OPTION ),
 			esc_attr( $path ),
-			esc_attr( '/var/www/private-media' )
+			esc_attr( $default_path )
 		);
+
+		echo '<p class="description">' . esc_html__( 'Leave blank to use the site default:', 'media-manager' ) . ' <code>' . esc_html( $default_path ) . '</code></p>';
 
 		$class = ! empty( $health['ok'] ) ? 'notice notice-success inline' : 'notice notice-warning inline';
 		printf(
@@ -252,8 +255,9 @@ class Settings {
 		foreach ( $types as $slug => $object ) {
 			$label = $object->labels->name ?? $slug;
 			printf(
-				'<label style="display:block;margin-bottom:4px;"><input type="checkbox" name="%1$s[generated_media_folders][%2$s]" value="1" %3$s /> %3$s</label>',
+				'<label style="display:block;margin-bottom:4px;"><input type="checkbox" name="%1$s[generated_media_folders][%2$s]" value="1" %3$s /> %4$s</label>',
 				esc_attr( self::OPTION ),
+				esc_attr( $slug ),
 				checked( ! empty( $map[ $slug ] ), true, false ),
 				esc_html( $label )
 			);

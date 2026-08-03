@@ -44,6 +44,8 @@ class Installer {
 			add_option( Settings::OPTION, Settings::defaults(), '', false );
 		}
 
+		( new \Eighteen73\MediaManager\PrivateMedia\StorageConfig() )->ensure_directory();
+
 		// Ensure private delivery rewrites are registered.
 		( new \Eighteen73\MediaManager\PrivateMedia\Delivery() )->add_rewrite_rules();
 		flush_rewrite_rules( false );

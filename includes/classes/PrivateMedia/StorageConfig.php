@@ -24,7 +24,7 @@ class StorageConfig {
 	public const SETTING_KEY = 'private_storage_path';
 
 	/**
-	 * Configured absolute path (trimmed, no trailing slash) or empty.
+	 * Configured absolute path, or the code-derived default when unset.
 	 *
 	 * @return string
 	 */
@@ -33,7 +33,59 @@ class StorageConfig {
 		$path     = isset( $settings[ self::SETTING_KEY ] ) ? (string) $settings[ self::SETTING_KEY ] : '';
 		$path     = trim( $path );
 
+		if ( '' === $path ) {
+			$path = self::default_path();
+		}
+
 		return untrailingslashit( $path );
+	}
+
+	/**
+	 * Default private storage path outside the web root.
+	 *
+	 * Bedrock-style installs (…/web/wp) resolve to {project}/private.
+	 * Standard installs resolve to a sibling of ABSPATH named private.
+	 *
+	 * @return string
+	 */
+	public static function default_path(): string {
+		$abspath = wp_normalize_path( untrailingslashit( ABSPATH ) );
+
+		if ( 'wp' === basename( $abspath ) ) {
+			$root = dirname( $abspath, 2 );
+		} else {
+			$root = dirname( $abspath );
+		}
+
+		$path = wp_normalize_path( $root . '/private' );
+
+		/**
+		 * Filter the default private storage path used when none is configured.
+		 *
+		 * @param string $path Absolute filesystem path.
+		 */
+		$filtered = apply_filters( 'media_manager_default_private_storage_path', $path );
+
+		return untrailingslashit( is_string( $filtered ) && '' !== $filtered ? $filtered : $path );
+	}
+
+	/**
+	 * Create the private storage directory when missing (best-effort).
+	 *
+	 * @return bool True when the directory exists and is writable.
+	 */
+	public function ensure_directory(): bool {
+		$path = $this->path();
+
+		if ( '' === $path ) {
+			return false;
+		}
+
+		if ( ! file_exists( $path ) ) {
+			wp_mkdir_p( $path );
+		}
+
+		return is_dir( $path ) && wp_is_writable( $path );
 	}
 
 	/**
@@ -75,6 +127,11 @@ class StorageConfig {
 			return $result;
 		}
 
+		// Attempt to create the default (or configured) path when missing.
+		if ( ! file_exists( $path ) ) {
+			$this->ensure_directory();
+		}
+
 		if ( ! file_exists( $path ) ) {
 			$result['message'] = __( 'The private storage path does not exist.', 'media-manager' );
 			return $result;
@@ -112,32 +169,14 @@ class StorageConfig {
 			return $result;
 		}
 
-		if ( ! is_writable( $real ) ) {
+		if ( ! wp_is_writable( $real ) ) {
 			$result['message'] = __( 'The private storage path is not writable.', 'media-manager' );
 			return $result;
 		}
 
 		$result['checks']['writable'] = true;
 
-		$probe = $real . DIRECTORY_SEPARATOR . '.media-manager-health-' . wp_generate_password( 8, false );
-		$ok    = false;
-
-		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
-		if ( false !== file_put_contents( $probe, 'ok' ) ) {
-			$renamed = $probe . '.renamed';
-			// phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename
-			if ( @rename( $probe, $renamed ) ) {
-				// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
-				$content = @file_get_contents( $renamed );
-				// phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-				@unlink( $renamed );
-				$ok = ( 'ok' === $content );
-			} else {
-				// phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-				@unlink( $probe );
-			}
-		}
-
+		$ok                     = $this->probe_io( $real );
 		$result['checks']['io'] = $ok;
 
 		if ( ! $ok ) {
@@ -149,5 +188,45 @@ class StorageConfig {
 		$result['message'] = __( 'Private storage is healthy.', 'media-manager' );
 
 		return $result;
+	}
+
+	/**
+	 * Probe create / rename / read / delete via WP_Filesystem.
+	 *
+	 * @param string $dir Absolute directory path.
+	 * @return bool
+	 */
+	private function probe_io( string $dir ): bool {
+		if ( ! function_exists( 'WP_Filesystem' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+		}
+
+		// Private storage is outside ABSPATH; allow relaxed ownership for the direct transport.
+		if ( ! WP_Filesystem( false, $dir, true ) ) {
+			return false;
+		}
+
+		global $wp_filesystem;
+
+		if ( ! $wp_filesystem instanceof \WP_Filesystem_Base ) {
+			return false;
+		}
+
+		$probe   = trailingslashit( $dir ) . '.media-manager-health-' . wp_generate_password( 8, false );
+		$renamed = $probe . '.renamed';
+
+		if ( ! $wp_filesystem->put_contents( $probe, 'ok', FS_CHMOD_FILE ) ) {
+			return false;
+		}
+
+		if ( ! $wp_filesystem->move( $probe, $renamed ) ) {
+			$wp_filesystem->delete( $probe );
+			return false;
+		}
+
+		$content = $wp_filesystem->get_contents( $renamed );
+		$wp_filesystem->delete( $renamed );
+
+		return 'ok' === $content;
 	}
 }

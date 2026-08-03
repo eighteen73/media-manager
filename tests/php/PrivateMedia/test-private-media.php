@@ -8,7 +8,6 @@
 use Eighteen73\MediaManager\Admin\Settings;
 use Eighteen73\MediaManager\Folders\FolderService;
 use Eighteen73\MediaManager\Install\Installer;
-use Eighteen73\MediaManager\Permissions\FolderPolicy;
 use Eighteen73\MediaManager\PrivateMedia\Delivery;
 use Eighteen73\MediaManager\PrivateMedia\PrivateStorage;
 use Eighteen73\MediaManager\PrivateMedia\StorageConfig;
@@ -67,6 +66,57 @@ class Test_Private_Media extends WP_UnitTestCase {
 	public function test_storage_health_ok() {
 		$health = ( new StorageConfig() )->health();
 		$this->assertTrue( $health['ok'], $health['message'] );
+	}
+
+	/**
+	 * Empty setting falls back to the code-derived default path.
+	 *
+	 * @return void
+	 */
+	public function test_empty_setting_uses_default_path() {
+		update_option(
+			Settings::OPTION,
+			array_merge(
+				Settings::defaults(),
+				[ 'private_storage_path' => '' ]
+			),
+			false
+		);
+
+		$config = new StorageConfig();
+		$this->assertSame( StorageConfig::default_path(), $config->path() );
+		$this->assertStringEndsWith( '/private', $config->path() );
+	}
+
+	/**
+	 * Default private path can be overridden via filter.
+	 *
+	 * @return void
+	 */
+	public function test_default_path_filter() {
+		$override = trailingslashit( sys_get_temp_dir() ) . 'mm-default-override-' . wp_generate_password( 6, false );
+		wp_mkdir_p( $override );
+
+		add_filter(
+			'media_manager_default_private_storage_path',
+			static function () use ( $override ) {
+				return $override;
+			}
+		);
+
+		update_option(
+			Settings::OPTION,
+			array_merge(
+				Settings::defaults(),
+				[ 'private_storage_path' => '' ]
+			),
+			false
+		);
+
+		$this->assertSame( untrailingslashit( $override ), ( new StorageConfig() )->path() );
+
+		remove_all_filters( 'media_manager_default_private_storage_path' );
+		$this->rrmdir( $override );
 	}
 
 	/**
