@@ -88,11 +88,6 @@ npx @wp-playground/cli server --auto-mount
 - **JS:** co-locate `*.test.js` next to the module; use Testing Library for components.
 - **E2E:** import `{ test, expect }` from `@wordpress/e2e-test-utils-playwright`, use `admin.visitAdminPage()`, prefer role/label locators, add `data-testid` on plugin UI when needed.
 
-## Documentation
-
-- [Public folders](docs/public-folders.md)
-- [ADR 0001: wp.media integration](docs/decisions/0001-wp-media-integration.md)
-
 ## License
 
 GPL-2.0-or-later
