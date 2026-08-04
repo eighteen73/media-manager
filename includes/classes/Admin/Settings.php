@@ -156,7 +156,7 @@ class Settings {
 			'media_manager_generated',
 			__( 'Generated media folders', 'media-manager' ),
 			static function (): void {
-				echo '<p>' . esc_html__( 'Creates a Media Library folder per post and sends editor uploads there.', 'media-manager' ) . '</p>';
+				echo '<p>' . esc_html__( 'Generate a media library folder per post type and automatically uploaded files there.', 'media-manager' ) . '</p>';
 			},
 			'media'
 		);
@@ -263,6 +263,5 @@ class Settings {
 			);
 		}
 		echo '</fieldset>';
-		echo '<p class="description">' . esc_html__( 'Creates a Media Library folder per post and sends editor uploads there.', 'media-manager' ) . '</p>';
 	}
 }
