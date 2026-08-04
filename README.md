@@ -36,7 +36,13 @@ npm run test:e2e
 
 Default wp-env credentials: `admin` / `password`.
 
-`npm run build` must succeed before E2E. An `afterStart` lifecycle script activates the plugin on both the development and tests sites.
+`npm run build` must succeed before E2E. First-time Playwright setup:
+
+```bash
+npm run playwright:install
+```
+
+E2E global setup authenticates as admin and activates Media Manager on the tests site (`:8889`).
 
 ## Testing standard (eighteen73)
 

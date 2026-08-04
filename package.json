@@ -24,6 +24,7 @@
 		"check-engines": "wp-scripts check-engines",
 		"check-licenses": "wp-scripts check-licenses",
 		"postinstall": "composer install -o",
+		"playwright:install": "playwright install chromium",
 		"wp-env": "wp-env",
 		"env": "wp-env",
 		"env:start": "wp-env start",

@@ -1,5 +1,5 @@
 /**
- * Authenticate as admin and persist Playwright storage state.
+ * Authenticate as admin, ensure the plugin is active, and persist storage state.
  */
 
 const { request } = require( '@playwright/test' );
@@ -23,6 +23,10 @@ async function globalSetup( config ) {
 	} );
 
 	await requestUtils.setupRest();
+
+	// wp-env does not always leave plugins active on the tests site after restart.
+	await requestUtils.activatePlugin( 'media-manager' );
+
 	await requestContext.dispose();
 }
 
