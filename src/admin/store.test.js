@@ -128,3 +128,103 @@ describe( 'downloadFolder action', () => {
 		expect( dispatch.setBusy ).toHaveBeenCalledWith( false );
 	} );
 } );
+
+describe( 'assign action', () => {
+	beforeEach( () => {
+		jest.clearAllMocks();
+		window.confirm = jest.fn( () => true );
+		window.mediaManagerAdmin = {
+			strings: {
+				privateConfirmEnter: 'Enter private?',
+				privateConfirmLeave: 'Leave private?',
+			},
+		};
+	} );
+
+	afterEach( () => {
+		delete window.confirm;
+		delete window.mediaManagerAdmin;
+	} );
+
+	it( 'forces move + confirm when targeting a private folder', async () => {
+		api.assignAttachments.mockResolvedValue( { assigned: true } );
+
+		const dispatch = {
+			setBusy: jest.fn(),
+			setNotice: jest.fn(),
+			setSelectedAttachmentIds: jest.fn(),
+			loadFolders: jest.fn( () => Promise.resolve() ),
+		};
+		const select = {
+			getSelectedAttachmentIds: () => [ 1, 2 ],
+			getTree: () => [
+				{ id: 9, name: 'Vault', is_private: true, children: [] },
+			],
+		};
+
+		const result = await actions.assign( 9, 'add' )( { dispatch, select } );
+
+		expect( window.confirm ).toHaveBeenCalledWith( 'Enter private?' );
+		expect( api.assignAttachments ).toHaveBeenCalledWith( {
+			attachmentIds: [ 1, 2 ],
+			folderId: 9,
+			mode: 'move',
+			confirm: true,
+		} );
+		expect( result ).toBe( true );
+	} );
+
+	it( 'returns false when private confirm is cancelled', async () => {
+		window.confirm.mockReturnValue( false );
+
+		const dispatch = {
+			setBusy: jest.fn(),
+			setNotice: jest.fn(),
+		};
+		const select = {
+			getSelectedAttachmentIds: () => [ 1 ],
+			getTree: () => [
+				{ id: 9, name: 'Vault', is_private: true, children: [] },
+			],
+		};
+
+		const result = await actions.assign( 9, 'move' )( { dispatch, select } );
+
+		expect( result ).toBe( false );
+		expect( api.assignAttachments ).not.toHaveBeenCalled();
+	} );
+
+	it( 'retries after confirmation_required from the server', async () => {
+		api.assignAttachments
+			.mockRejectedValueOnce( {
+				code: 'media_manager_confirmation_required',
+				message: 'Confirm leave',
+				data: { needs_enter: false },
+			} )
+			.mockResolvedValueOnce( { assigned: true } );
+
+		const dispatch = {
+			setBusy: jest.fn(),
+			setNotice: jest.fn(),
+			setSelectedAttachmentIds: jest.fn(),
+			loadFolders: jest.fn( () => Promise.resolve() ),
+		};
+		const select = {
+			getSelectedAttachmentIds: () => [ 3 ],
+			getTree: () => [
+				{ id: 4, name: 'Public', is_private: false, children: [] },
+			],
+		};
+
+		const result = await actions.assign( 4, 'move' )( { dispatch, select } );
+
+		expect( window.confirm ).toHaveBeenCalledWith( 'Leave private?' );
+		expect( api.assignAttachments ).toHaveBeenNthCalledWith( 2, {
+			attachmentIds: [ 3 ],
+			folderId: 4,
+			mode: 'move',
+			confirm: true,
+		} );
+		expect( result ).toBe( true );
+	} );
+} );

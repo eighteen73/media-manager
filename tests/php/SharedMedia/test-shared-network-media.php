@@ -7,7 +7,10 @@
 
 use Eighteen73\MediaManager\Admin\NetworkSettings;
 use Eighteen73\MediaManager\Install\Installer;
+use Eighteen73\MediaManager\Permissions\Capabilities;
+use Eighteen73\MediaManager\SharedMedia\AttachmentResolver;
 use Eighteen73\MediaManager\SharedMedia\NetworkLibrary;
+use Eighteen73\MediaManager\SharedMedia\SharedMedia;
 
 /**
  * Tests for network library settings and resolver filters.
@@ -205,5 +208,138 @@ class Test_Shared_Network_Media extends WP_UnitTestCase {
 		}
 
 		$this->assertTrue( $found, 'Network Media submenu should be registered under settings.php.' );
+	}
+
+	/**
+	 * Featured network meta is set/cleared based on network attachment IDs.
+	 *
+	 * @return void
+	 */
+	public function test_maybe_mark_featured_network_meta() {
+		if ( ! is_multisite() ) {
+			$this->markTestSkipped( 'Multisite required.' );
+		}
+
+		$library_id = self::factory()->blog->create();
+		NetworkLibrary::update_library_id( (int) $library_id );
+
+		switch_to_blog( (int) $library_id );
+		$network_attachment = self::factory()->attachment->create_object(
+			[
+				'file'           => 'network-featured.jpg',
+				'post_mime_type' => 'image/jpeg',
+				'post_title'     => 'Network Featured',
+			]
+		);
+		restore_current_blog();
+
+		$post_id = self::factory()->post->create();
+		$shared  = new SharedMedia();
+
+		$shared->maybe_mark_featured_network( $post_id, (int) $network_attachment );
+		$this->assertSame(
+			'1',
+			(string) get_post_meta( $post_id, AttachmentResolver::META_FEATURED_NETWORK, true )
+		);
+
+		$local = self::factory()->attachment->create_object(
+			[
+				'file'           => 'local-featured.jpg',
+				'post_mime_type' => 'image/jpeg',
+				'post_title'     => 'Local Featured',
+			]
+		);
+		$shared->maybe_mark_featured_network( $post_id, (int) $local );
+		$this->assertSame(
+			'',
+			(string) get_post_meta( $post_id, AttachmentResolver::META_FEATURED_NETWORK, true )
+		);
+
+		$shared->maybe_mark_featured_from_meta( 1, $post_id, '_thumbnail_id', $network_attachment );
+		$this->assertSame(
+			'1',
+			(string) get_post_meta( $post_id, AttachmentResolver::META_FEATURED_NETWORK, true )
+		);
+
+		$shared->maybe_clear_featured_network( [ 1 ], $post_id, '_thumbnail_id', $network_attachment );
+		$this->assertSame(
+			'',
+			(string) get_post_meta( $post_id, AttachmentResolver::META_FEATURED_NETWORK, true )
+		);
+	}
+
+	/**
+	 * REST featured_media priming accepts network attachment ids without error.
+	 *
+	 * @return void
+	 */
+	public function test_maybe_prime_featured_media() {
+		if ( ! is_multisite() ) {
+			$this->markTestSkipped( 'Multisite required.' );
+		}
+
+		$library_id = self::factory()->blog->create();
+		NetworkLibrary::update_library_id( (int) $library_id );
+
+		switch_to_blog( (int) $library_id );
+		$network_attachment = self::factory()->attachment->create_object(
+			[
+				'file'           => 'prime-featured.jpg',
+				'post_mime_type' => 'image/jpeg',
+				'post_title'     => 'Prime Featured',
+			]
+		);
+		restore_current_blog();
+
+		$request = new WP_REST_Request( 'POST', '/wp/v2/posts/1' );
+		$request->set_param( 'featured_media', (int) $network_attachment );
+
+		$shared   = new SharedMedia();
+		$response = $shared->maybe_prime_featured_media( null, [], $request );
+		$this->assertNull( $response );
+
+		$settings = $shared->filter_media_view_settings( [], null );
+		$this->assertArrayHasKey( 'mediaManagerFeaturedNetwork', $settings );
+		$this->assertFalse( $settings['mediaManagerFeaturedNetwork'] );
+
+		$post_id = self::factory()->post->create();
+		update_post_meta( $post_id, AttachmentResolver::META_FEATURED_NETWORK, 1 );
+		$settings = $shared->filter_media_view_settings( [], get_post( $post_id ) );
+		$this->assertTrue( $settings['mediaManagerFeaturedNetwork'] );
+	}
+
+	/**
+	 * Shared folders REST requires shared media access and returns a tree payload.
+	 *
+	 * @return void
+	 */
+	public function test_shared_folders_rest_auth_and_shape() {
+		if ( ! is_multisite() ) {
+			$this->markTestSkipped( 'Multisite required.' );
+		}
+
+		do_action( 'rest_api_init' );
+
+		$request  = new WP_REST_Request( 'GET', '/media-manager/v1/shared-folders' );
+		$response = rest_get_server()->dispatch( $request );
+		$this->assertSame( 403, $response->get_status() );
+
+		$library_id = self::factory()->blog->create();
+		NetworkLibrary::update_library_id( (int) $library_id );
+
+		switch_to_blog( (int) $library_id );
+		Capabilities::grant_defaults();
+		restore_current_blog();
+
+		$editor = self::factory()->user->create( [ 'role' => 'editor' ] );
+		add_user_to_blog( (int) $library_id, $editor, 'editor' );
+		wp_set_current_user( $editor );
+
+		$response = rest_get_server()->dispatch( $request );
+		$this->assertSame( 200, $response->get_status(), wp_json_encode( $response->get_data() ) );
+		$data = $response->get_data();
+		$this->assertIsArray( $data );
+		$this->assertArrayHasKey( 'folders', $data );
+		$this->assertArrayHasKey( 'summary', $data );
 	}
 }

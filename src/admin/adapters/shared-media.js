@@ -131,7 +131,7 @@ export function isSharedMediaState( state ) {
  * @param {*} id Candidate id.
  * @return {boolean} True when a positive integer id.
  */
-function isValidAttachmentId( id ) {
+export function isValidAttachmentId( id ) {
 	if ( id === 0 || id === '0' ) {
 		return true;
 	}
@@ -148,7 +148,7 @@ function isValidAttachmentId( id ) {
  *
  * @return {number|null} Featured attachment id.
  */
-function resolveFeaturedAttachmentId() {
+export function resolveFeaturedAttachmentId() {
 	const settingsId =
 		window.wp?.media?.view?.settings?.post?.featuredImageId;
 	const editor = window.wp?.data?.select?.( 'core/editor' );
@@ -175,7 +175,7 @@ function resolveFeaturedAttachmentId() {
  *
  * @return {boolean} True when a restore was applied.
  */
-function restoreCorruptedFeaturedMedia() {
+export function restoreCorruptedFeaturedMedia() {
 	const editorSelect = window.wp?.data?.select?.( 'core/editor' );
 	const editorDispatch = window.wp?.data?.dispatch?.( 'core/editor' );
 	if ( ! editorSelect || ! editorDispatch?.editPost ) {
@@ -224,7 +224,7 @@ function restoreCorruptedFeaturedMedia() {
  *
  * @return {boolean} True when featured image is from the shared library.
  */
-function currentFeaturedIsNetwork() {
+export function currentFeaturedIsNetwork() {
 	const featuredId = resolveFeaturedAttachmentId();
 	if ( ! featuredId ) {
 		return false;
@@ -247,7 +247,7 @@ function currentFeaturedIsNetwork() {
  * @param {boolean} isNetwork Whether selection is network media.
  * @return {void}
  */
-function setFeaturedNetworkFlag( isNetwork ) {
+export function setFeaturedNetworkFlag( isNetwork ) {
 	const settings = window.wp?.media?.view?.settings;
 	if ( settings ) {
 		settings.mediaManagerFeaturedNetwork = !! isNetwork;
@@ -446,7 +446,7 @@ function ensureSelectionAttachmentUrls( selection ) {
  * @param {Object|null} selection Selection collection.
  * @return {void}
  */
-function sanitizeAttachmentSelection( selection ) {
+export function sanitizeAttachmentSelection( selection ) {
 	if ( ! selection?.models?.length ) {
 		return;
 	}
@@ -717,7 +717,7 @@ function resolveFrameSelectionAttachmentId( frame ) {
  * @param {boolean}     allowFeaturedMeta Allow featured-network boot flags.
  * @return {boolean} True when network.
  */
-function attachmentLooksNetwork( attachment, attachmentId, allowFeaturedMeta ) {
+export function attachmentLooksNetwork( attachment, attachmentId, allowFeaturedMeta ) {
 	if ( attachment?.get?.( 'media_manager_network' ) ) {
 		return true;
 	}

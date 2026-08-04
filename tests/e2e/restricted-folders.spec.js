@@ -13,6 +13,6 @@ test.describe( 'Restricted folders', () => {
 		await expect( page.locator( '#media-manager-folder-root' ) ).toBeVisible();
 		await page.getByRole( 'button', { name: 'Add Folder' } ).click();
 		await expect( page.getByLabel( 'Restrict Access' ) ).toBeVisible();
-		await expect( page.getByLabel( 'Private' ) ).toBeVisible();
+		await expect( page.locator( '#media-manager-folder-private' ) ).toBeVisible();
 	} );
 } );

@@ -10,7 +10,7 @@ import {
 	resolveLibraryCollection,
 } from './media-library';
 import { setUploaderFolder, findUploadHosts, ensureUploadSelectMount } from './uploader';
-import { observeMediaFrames } from './media-modal';
+import { observeMediaFrames, ensureModalFolderMount } from './media-modal';
 import { resolveDragAttachmentIds } from './drag-drop';
 
 beforeAll( () => {
@@ -240,6 +240,33 @@ describe( 'media modal adapter', () => {
 		expect( onFrame ).toHaveBeenCalledTimes( 1 );
 		teardown();
 		expect( window.wp.media.view.Modal ).toBe( OriginalModal );
+	} );
+
+	it( 'mounts from a content:create browserView before DOM attach', () => {
+		const browser = document.createElement( 'div' );
+		browser.className = 'attachments-browser';
+		const frameEl = document.createElement( 'div' );
+		const frame = {
+			$el: {
+				get: () => frameEl,
+				0: frameEl,
+				find: () => ( { get: () => null } ),
+			},
+			content: { get: () => null },
+		};
+
+		const mount = ensureModalFolderMount( frame, { el: browser } );
+
+		expect( mount ).toBeTruthy();
+		expect( mount.className ).toBe( 'media-manager-modal-folders' );
+		expect( browser.firstChild ).toBe( mount );
+		expect( browser.classList.contains( 'has-media-manager-folders' ) ).toBe(
+			true
+		);
+		expect(
+			frameEl.classList.contains( 'has-media-manager-folders' )
+		).toBe( true );
+		expect( ensureModalFolderMount( frame, { el: browser } ) ).toBe( mount );
 	} );
 } );
 

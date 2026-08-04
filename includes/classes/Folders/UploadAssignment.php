@@ -133,47 +133,59 @@ class UploadAssignment {
 	 * @return array
 	 */
 	public function filter_upload_dir( array $uploads ): array {
-		$folder_id = $this->resolve_upload_folder();
-
-		if ( null === $folder_id || $folder_id < 1 ) {
+		// StorageConfig::health() calls wp_upload_dir(); avoid re-entering this filter.
+		static $filtering = false;
+		if ( $filtering ) {
 			return $uploads;
 		}
 
-		if ( ! $this->access->can_assign_folders() || ! $this->access->can_access_folder( $folder_id ) ) {
+		$filtering = true;
+
+		try {
+			$folder_id = $this->resolve_upload_folder();
+
+			if ( null === $folder_id || $folder_id < 1 ) {
+				return $uploads;
+			}
+
+			if ( ! $this->access->can_assign_folders() || ! $this->access->can_access_folder( $folder_id ) ) {
+				return $uploads;
+			}
+
+			$policy = $this->policy->get_effective( $folder_id );
+			if ( is_wp_error( $policy ) || empty( $policy['is_private'] ) ) {
+				return $uploads;
+			}
+
+			if ( ! ( new StorageConfig() )->is_ready() ) {
+				return $uploads;
+			}
+
+			$root = $this->storage->site_root();
+			if ( is_wp_error( $root ) ) {
+				return $uploads;
+			}
+
+			$subdir  = isset( $uploads['subdir'] ) ? (string) $uploads['subdir'] : '';
+			$basedir = $root;
+			$baseurl = home_url( '/media' ); // Placeholder base; delivery URLs are rewritten.
+			$path    = $basedir . $subdir;
+
+			if ( ! is_dir( $path ) ) {
+				wp_mkdir_p( $path );
+			}
+
+			$uploads['path']    = $path;
+			$uploads['url']     = $baseurl . $subdir;
+			$uploads['basedir'] = $basedir;
+			$uploads['baseurl'] = $baseurl;
+
+			$this->private_upload_active = true;
+
 			return $uploads;
+		} finally {
+			$filtering = false;
 		}
-
-		$policy = $this->policy->get_effective( $folder_id );
-		if ( is_wp_error( $policy ) || empty( $policy['is_private'] ) ) {
-			return $uploads;
-		}
-
-		if ( ! ( new StorageConfig() )->is_ready() ) {
-			return $uploads;
-		}
-
-		$root = $this->storage->site_root();
-		if ( is_wp_error( $root ) ) {
-			return $uploads;
-		}
-
-		$subdir  = isset( $uploads['subdir'] ) ? (string) $uploads['subdir'] : '';
-		$basedir = $root;
-		$baseurl = home_url( '/media' ); // Placeholder base; delivery URLs are rewritten.
-		$path    = $basedir . $subdir;
-
-		if ( ! is_dir( $path ) ) {
-			wp_mkdir_p( $path );
-		}
-
-		$uploads['path']    = $path;
-		$uploads['url']     = $baseurl . $subdir;
-		$uploads['basedir'] = $basedir;
-		$uploads['baseurl'] = $baseurl;
-
-		$this->private_upload_active = true;
-
-		return $uploads;
 	}
 
 	/**
