@@ -388,7 +388,7 @@ class PrivateStorage {
 			return 0;
 		}
 
-		$moved = 0;
+		$moved    = 0;
 		$iterator = new \RecursiveIteratorIterator(
 			new \RecursiveDirectoryIterator( $legacy, \FilesystemIterator::SKIP_DOTS ),
 			\RecursiveIteratorIterator::SELF_FIRST

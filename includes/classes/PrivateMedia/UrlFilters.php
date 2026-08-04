@@ -177,8 +177,8 @@ class UrlFilters {
 	/**
 	 * Rewrite Media Library JS attachment models.
 	 *
-	 * @param array      $response   Attachment data.
-	 * @param \WP_Post   $attachment Attachment post.
+	 * @param array       $response   Attachment data.
+	 * @param \WP_Post    $attachment Attachment post.
 	 * @param array|false $meta      Attachment meta.
 	 * @return array
 	 */

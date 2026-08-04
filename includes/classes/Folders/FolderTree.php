@@ -49,10 +49,10 @@ class FolderTree {
 	/**
 	 * Constructor.
 	 *
-	 * @param FolderRepository|null         $repository Optional repository.
-	 * @param EffectiveAcl|null             $acl        Optional ACL.
-	 * @param FolderPolicy|null             $policy     Optional policy.
-	 * @param ContentFolderRepository|null  $content    Optional content repository.
+	 * @param FolderRepository|null        $repository Optional repository.
+	 * @param EffectiveAcl|null            $acl        Optional ACL.
+	 * @param FolderPolicy|null            $policy     Optional policy.
+	 * @param ContentFolderRepository|null $content    Optional content repository.
 	 */
 	public function __construct(
 		?FolderRepository $repository = null,

@@ -1,3 +1,5 @@
+/* global URL */
+
 /**
  * Media Manager REST API helpers.
  */
@@ -112,9 +114,7 @@ export async function downloadFolder(id) {
 	}
 
 	const disposition = response.headers.get('Content-Disposition') || '';
-	const match = disposition.match(
-		/filename\*?=(?:UTF-8''|")?([^\";]+)"?/i
-	);
+	const match = disposition.match(/filename\*?=(?:UTF-8''|")?([^\";]+)"?/i);
 	const filename = match
 		? decodeURIComponent(match[1].replace(/["']/g, '').trim())
 		: `folder-${id}.zip`;
@@ -155,9 +155,7 @@ async function normalizeDownloadError(error) {
 		}
 	}
 
-	const normalized = new Error(
-		message || 'Unable to download folder.'
-	);
+	const normalized = new Error(message || 'Unable to download folder.');
 	normalized.code = 'media_manager_download_failed';
 	normalized.data = { status };
 	return normalized;

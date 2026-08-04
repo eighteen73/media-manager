@@ -361,7 +361,7 @@ class ContentFolderService {
 			return false;
 		}
 
-		$own = $this->content->find_folder_for_post( (int) $post->ID );
+		$own    = $this->content->find_folder_for_post( (int) $post->ID );
 		$own_id = $own instanceof WP_Term ? (int) $own->term_id : 0;
 
 		foreach ( $this->repository->children_of( (int) $root->term_id ) as $child ) {

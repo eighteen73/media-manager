@@ -52,8 +52,8 @@ class Assets {
 	 * @return void
 	 */
 	public function enqueue( string $hook_suffix ): void {
-		$can_view = $this->access->can_view_folders();
-		$media_screens = [ 'upload.php', 'media-new.php' ];
+		$can_view        = $this->access->can_view_folders();
+		$media_screens   = [ 'upload.php', 'media-new.php' ];
 		$is_media_screen = in_array( $hook_suffix, $media_screens, true );
 
 		if ( ! $can_view ) {

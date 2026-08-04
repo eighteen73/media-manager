@@ -1,3 +1,5 @@
+/* global HTMLInputElement */
+
 /**
  * Media Library grid adapter.
  */
@@ -8,8 +10,8 @@
  * @param {number|null} folderId Folder selection.
  * @return {string|number} Query value.
  */
-export function serializeFolderId( folderId ) {
-	if ( folderId === null || typeof folderId === 'undefined' ) {
+export function serializeFolderId(folderId) {
+	if (folderId === null || typeof folderId === 'undefined') {
 		return 'all';
 	}
 	return folderId;
@@ -21,21 +23,21 @@ export function serializeFolderId( folderId ) {
  * @param {Object} [frame] Optional media frame.
  * @return {Object|null} Attachments collection.
  */
-export function resolveLibraryCollection( frame ) {
+export function resolveLibraryCollection(frame) {
 	const mediaFrame = frame || window.wp?.media?.frame;
-	if ( ! mediaFrame ) {
+	if (!mediaFrame) {
 		return null;
 	}
 
 	const content = mediaFrame.content?.get?.();
-	if ( content?.collection ) {
+	if (content?.collection) {
 		return content.collection;
 	}
 
 	// wp.media.frame.state is a method, not a Backbone model.
 	const state =
 		typeof mediaFrame.state === 'function' ? mediaFrame.state() : null;
-	return state?.get?.( 'library' ) || null;
+	return state?.get?.('library') || null;
 }
 
 /**
@@ -47,22 +49,22 @@ export function resolveLibraryCollection( frame ) {
  *
  * @param {Object} collection Attachments collection.
  */
-export function ensureLibraryObservesUploads( collection ) {
-	if ( ! collection || typeof collection.observe !== 'function' ) {
+export function ensureLibraryObservesUploads(collection) {
+	if (!collection || typeof collection.observe !== 'function') {
 		return;
 	}
 
 	const queue = window.wp?.Uploader?.queue;
-	if ( ! queue ) {
+	if (!queue) {
 		return;
 	}
 
-	if ( collection.__mmObservingUploads ) {
+	if (collection.__mmObservingUploads) {
 		return;
 	}
 
 	collection.__mmObservingUploads = true;
-	collection.observe( queue );
+	collection.observe(queue);
 }
 
 /**
@@ -71,29 +73,29 @@ export function ensureLibraryObservesUploads( collection ) {
  * @param {Object}      collection Backbone collection.
  * @param {number|null} folderId   Folder selection.
  */
-export function setCollectionFolder( collection, folderId ) {
-	if ( ! collection || typeof collection.props?.set !== 'function' ) {
+export function setCollectionFolder(collection, folderId) {
+	if (!collection || typeof collection.props?.set !== 'function') {
 		return;
 	}
 
-	const value = serializeFolderId( folderId );
-	const current = collection.props.get( 'media_manager_folder' );
+	const value = serializeFolderId(folderId);
+	const current = collection.props.get('media_manager_folder');
 
-	if ( current !== value ) {
+	if (current !== value) {
 		// Query collections auto-requery when props change.
-		collection.props.set( { media_manager_folder: value } );
+		collection.props.set({ media_manager_folder: value });
 
 		// Non-query collections need an explicit fetch.
 		if (
-			! collection.props.get( 'query' ) &&
+			!collection.props.get('query') &&
 			typeof collection.fetch === 'function'
 		) {
-			collection.fetch( { reset: true, remove: true } );
+			collection.fetch({ reset: true, remove: true });
 		}
 	}
 
 	// Folder query args remove core's automatic queue observation.
-	ensureLibraryObservesUploads( collection );
+	ensureLibraryObservesUploads(collection);
 }
 
 /**
@@ -102,9 +104,9 @@ export function setCollectionFolder( collection, folderId ) {
  * @param {Object} model Attachment model.
  * @return {void}
  */
-function syncAttachmentUrlFields( model ) {
-	const url = model?.get?.( 'url' );
-	if ( ! url ) {
+function syncAttachmentUrlFields(model) {
+	const url = model?.get?.('url');
+	if (!url) {
 		return;
 	}
 
@@ -118,21 +120,21 @@ function syncAttachmentUrlFields( model ) {
 		'.attachment-details input[type="text"]',
 	];
 
-	selectors.forEach( ( selector ) => {
-		document.querySelectorAll( selector ).forEach( ( input ) => {
-			if ( ! ( input instanceof HTMLInputElement ) ) {
+	selectors.forEach((selector) => {
+		document.querySelectorAll(selector).forEach((input) => {
+			if (!(input instanceof HTMLInputElement)) {
 				return;
 			}
 			const looksLikeUrl =
-				input.id.includes( 'copy-link' ) ||
-				input.className.includes( 'url' ) ||
-				/^https?:\/\//.test( input.value ) ||
+				input.id.includes('copy-link') ||
+				input.className.includes('url') ||
+				/^https?:\/\//.test(input.value) ||
 				input.readOnly;
-			if ( looksLikeUrl ) {
+			if (looksLikeUrl) {
 				input.value = url;
 			}
-		} );
-	} );
+		});
+	});
 }
 
 /**
@@ -141,14 +143,14 @@ function syncAttachmentUrlFields( model ) {
  * @param {Object} [frame] Optional media frame.
  * @return {void}
  */
-export function refreshVisibleMedia( frame = null ) {
+export function refreshVisibleMedia(frame = null) {
 	const mediaFrame = frame || window.wp?.media?.frame;
 	let library = null;
 	let selection = null;
 
 	try {
-		library = resolveLibraryCollection( mediaFrame );
-	} catch ( _error ) {
+		library = resolveLibraryCollection(mediaFrame);
+	} catch (_error) {
 		library = null;
 	}
 
@@ -157,87 +159,87 @@ export function refreshVisibleMedia( frame = null ) {
 			mediaFrame && typeof mediaFrame.state === 'function'
 				? mediaFrame.state()
 				: null;
-		selection = state?.get?.( 'selection' ) || null;
-	} catch ( _error ) {
+		selection = state?.get?.('selection') || null;
+	} catch (_error) {
 		selection = null;
 	}
 
 	const refreshed = new Set();
 	const pending = [];
 
-	const refreshModel = ( model ) => {
-		if ( ! model?.fetch ) {
+	const refreshModel = (model) => {
+		if (!model?.fetch) {
 			return;
 		}
 
-		const id = model.get?.( 'id' ) || model.id;
-		if ( id && refreshed.has( id ) ) {
+		const id = model.get?.('id') || model.id;
+		if (id && refreshed.has(id)) {
 			return;
 		}
-		if ( id ) {
-			refreshed.add( id );
+		if (id) {
+			refreshed.add(id);
 		}
 
 		const apply = () => {
-			const url = model.get?.( 'url' );
-			if ( url && typeof model.set === 'function' ) {
-				model.set( { url, link: url } );
+			const url = model.get?.('url');
+			if (url && typeof model.set === 'function') {
+				model.set({ url, link: url });
 			}
-			syncAttachmentUrlFields( model );
+			syncAttachmentUrlFields(model);
 		};
 
 		const result = model.fetch();
-		pending.push( result );
-		if ( result && typeof result.done === 'function' ) {
-			result.done( apply );
-		} else if ( result && typeof result.then === 'function' ) {
-			result.then( apply ).catch( () => {} );
+		pending.push(result);
+		if (result && typeof result.done === 'function') {
+			result.done(apply);
+		} else if (result && typeof result.then === 'function') {
+			result.then(apply).catch(() => {});
 		} else {
-			window.setTimeout( apply, 300 );
+			window.setTimeout(apply, 300);
 		}
 	};
 
-	selection?.each?.( refreshModel );
+	selection?.each?.(refreshModel);
 
 	const selected = document.querySelectorAll(
 		'.attachment.selected, .attachment[aria-checked="true"], .attachment.details, .attachments .selected'
 	);
-	selected.forEach( ( el ) => {
-		const id = parseInt( el.dataset?.id || el.getAttribute( 'data-id' ), 10 );
-		if ( ! id || ! window.wp?.media?.attachment ) {
+	selected.forEach((el) => {
+		const id = parseInt(el.dataset?.id || el.getAttribute('data-id'), 10);
+		if (!id || !window.wp?.media?.attachment) {
 			return;
 		}
-		refreshModel( window.wp.media.attachment( id ) );
-	} );
+		refreshModel(window.wp.media.attachment(id));
+	});
 
 	const detailsId = parseInt(
 		document
 			.querySelector(
 				'.attachment-details[data-id], .media-sidebar .attachment-details'
 			)
-			?.getAttribute?.( 'data-id' ) ||
-			document.querySelector( '.attachment.details' )?.dataset?.id ||
+			?.getAttribute?.('data-id') ||
+			document.querySelector('.attachment.details')?.dataset?.id ||
 			0,
 		10
 	);
-	if ( detailsId > 0 && window.wp?.media?.attachment ) {
-		refreshModel( window.wp.media.attachment( detailsId ) );
+	if (detailsId > 0 && window.wp?.media?.attachment) {
+		refreshModel(window.wp.media.attachment(detailsId));
 	}
 
-	library?.each?.( refreshModel );
+	library?.each?.(refreshModel);
 
 	// Avoid racing a library reset over in-flight model fetches (stale URLs win).
 	const refetchLibrary = () => {
-		if ( library?.fetch ) {
-			library.fetch( { reset: true, remove: true } );
+		if (library?.fetch) {
+			library.fetch({ reset: true, remove: true });
 		}
 	};
 
 	const jq = window.jQuery;
-	if ( jq && pending.length && typeof jq.when === 'function' ) {
-		jq.when( ...pending.filter( Boolean ) ).always( refetchLibrary );
+	if (jq && pending.length && typeof jq.when === 'function') {
+		jq.when(...pending.filter(Boolean)).always(refetchLibrary);
 	} else {
-		window.setTimeout( refetchLibrary, 400 );
+		window.setTimeout(refetchLibrary, 400);
 	}
 }
 
@@ -247,40 +249,40 @@ export function refreshVisibleMedia( frame = null ) {
  * @param {{ root: HTMLElement, store?: Object }} options Mount options.
  * @return {Function} Teardown function.
  */
-export function mountMediaLibrarySidebar( { root } ) {
-	if ( ! root ) {
+export function mountMediaLibrarySidebar({ root }) {
+	if (!root) {
 		return () => {};
 	}
 
-	const wpBody = document.getElementById( 'wpbody' );
-	const host = wpBody || document.getElementById( 'wpbody-content' );
+	const wpBody = document.getElementById('wpbody');
+	const host = wpBody || document.getElementById('wpbody-content');
 
-	if ( ! host ) {
+	if (!host) {
 		return () => {};
 	}
 
 	root.hidden = false;
-	root.classList.add( 'media-manager-folder-root--mounted' );
-	host.classList.add( 'media-manager-has-folders' );
-	document.body.classList.add( 'media-manager-folders-active' );
+	root.classList.add('media-manager-folder-root--mounted');
+	host.classList.add('media-manager-has-folders');
+	document.body.classList.add('media-manager-folders-active');
 
-	let handler = document.getElementById( 'media-manager-handler' );
-	if ( ! handler ) {
-		handler = document.createElement( 'div' );
+	let handler = document.getElementById('media-manager-handler');
+	if (!handler) {
+		handler = document.createElement('div');
 		handler.id = 'media-manager-handler';
 	}
 
-	if ( root.parentElement !== host ) {
-		host.insertBefore( root, host.firstChild );
+	if (root.parentElement !== host) {
+		host.insertBefore(root, host.firstChild);
 	}
-	if ( handler.parentElement !== host ) {
-		host.insertBefore( handler, root.nextSibling );
+	if (handler.parentElement !== host) {
+		host.insertBefore(handler, root.nextSibling);
 	}
 
-	const onMouseDown = ( event ) => {
+	const onMouseDown = (event) => {
 		event.preventDefault();
-		const sidebar = root.querySelector( '.media-manager-sidebar' );
-		if ( ! sidebar ) {
+		const sidebar = root.querySelector('.media-manager-sidebar');
+		if (!sidebar) {
 			return;
 		}
 
@@ -288,36 +290,36 @@ export function mountMediaLibrarySidebar( { root } ) {
 		const startWidth = sidebar.getBoundingClientRect().width;
 		let latest = startWidth;
 
-		const onMove = ( moveEvent ) => {
+		const onMove = (moveEvent) => {
 			latest = Math.min(
 				500,
-				Math.max( 250, startWidth + ( moveEvent.clientX - startX ) )
+				Math.max(250, startWidth + (moveEvent.clientX - startX))
 			);
-			sidebar.style.width = `${ latest }px`;
+			sidebar.style.width = `${latest}px`;
 		};
 
 		const onUp = () => {
-			document.removeEventListener( 'mousemove', onMove );
-			document.removeEventListener( 'mouseup', onUp );
-			if ( window.wp?.data?.dispatch ) {
+			document.removeEventListener('mousemove', onMove);
+			document.removeEventListener('mouseup', onUp);
+			if (window.wp?.data?.dispatch) {
 				window.wp.data
-					.dispatch( 'media-manager/folders' )
-					.savePreferences( { sidebar_width: latest } );
+					.dispatch('media-manager/folders')
+					.savePreferences({ sidebar_width: latest });
 			}
 		};
 
-		document.addEventListener( 'mousemove', onMove );
-		document.addEventListener( 'mouseup', onUp );
+		document.addEventListener('mousemove', onMove);
+		document.addEventListener('mouseup', onUp);
 	};
 
-	handler.addEventListener( 'mousedown', onMouseDown );
+	handler.addEventListener('mousedown', onMouseDown);
 
 	return () => {
-		handler.removeEventListener( 'mousedown', onMouseDown );
+		handler.removeEventListener('mousedown', onMouseDown);
 		root.hidden = true;
-		root.classList.remove( 'media-manager-folder-root--mounted' );
-		host.classList.remove( 'media-manager-has-folders' );
-		document.body.classList.remove( 'media-manager-folders-active' );
+		root.classList.remove('media-manager-folder-root--mounted');
+		host.classList.remove('media-manager-has-folders');
+		document.body.classList.remove('media-manager-folders-active');
 		handler.remove();
 	};
 }
@@ -328,9 +330,9 @@ export function mountMediaLibrarySidebar( { root } ) {
  * @param {{ onCollection?: Function }} options Callbacks.
  * @return {Function} Teardown function.
  */
-export function observeLibraryCollection( { onCollection } = {} ) {
+export function observeLibraryCollection({ onCollection } = {}) {
 	const wp = window.wp;
-	if ( ! wp?.media || typeof onCollection !== 'function' ) {
+	if (!wp?.media || typeof onCollection !== 'function') {
 		return () => {};
 	}
 
@@ -339,50 +341,50 @@ export function observeLibraryCollection( { onCollection } = {} ) {
 	let boundFrame = null;
 
 	const notify = () => {
-		if ( cancelled ) {
+		if (cancelled) {
 			return false;
 		}
-		const collection = resolveLibraryCollection( wp.media.frame );
-		if ( collection ) {
-			onCollection( collection );
+		const collection = resolveLibraryCollection(wp.media.frame);
+		if (collection) {
+			onCollection(collection);
 			return true;
 		}
 		return false;
 	};
 
-	const bindFrame = ( frame ) => {
-		if ( ! frame || boundFrame === frame ) {
+	const bindFrame = (frame) => {
+		if (!frame || boundFrame === frame) {
 			return;
 		}
-		if ( boundFrame ) {
-			boundFrame.off?.( 'ready', notify );
-			boundFrame.off?.( 'content:render', notify );
+		if (boundFrame) {
+			boundFrame.off?.('ready', notify);
+			boundFrame.off?.('content:render', notify);
 		}
 		boundFrame = frame;
-		frame.on?.( 'ready', notify );
-		frame.on?.( 'content:render', notify );
+		frame.on?.('ready', notify);
+		frame.on?.('content:render', notify);
 		notify();
 	};
 
-	if ( wp.media.frame ) {
-		bindFrame( wp.media.frame );
+	if (wp.media.frame) {
+		bindFrame(wp.media.frame);
 	}
 
 	// Frame/content often mounts after our bootstrap on upload.php.
-	const timer = window.setInterval( () => {
+	const timer = window.setInterval(() => {
 		tries += 1;
-		if ( wp.media.frame ) {
-			bindFrame( wp.media.frame );
+		if (wp.media.frame) {
+			bindFrame(wp.media.frame);
 		}
-		if ( notify() || tries > 40 ) {
-			window.clearInterval( timer );
+		if (notify() || tries > 40) {
+			window.clearInterval(timer);
 		}
-	}, 250 );
+	}, 250);
 
 	return () => {
 		cancelled = true;
-		window.clearInterval( timer );
-		boundFrame?.off?.( 'ready', notify );
-		boundFrame?.off?.( 'content:render', notify );
+		window.clearInterval(timer);
+		boundFrame?.off?.('ready', notify);
+		boundFrame?.off?.('content:render', notify);
 	};
 }

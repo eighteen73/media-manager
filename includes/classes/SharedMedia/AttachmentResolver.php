@@ -99,7 +99,7 @@ class AttachmentResolver {
 		}
 
 		// Clone so cache mutations do not affect the switched-blog instance.
-		$cached = clone $remote;
+		$cached         = clone $remote;
 		$cached->filter = 'raw';
 		wp_cache_set( $attachment_id, $cached, 'posts' );
 

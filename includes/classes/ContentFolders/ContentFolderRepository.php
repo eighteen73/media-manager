@@ -249,11 +249,11 @@ class ContentFolderRepository {
 	 */
 	public function flags( int $folder_id ): array {
 		return [
-			'is_system_root'    => $this->is_system_root( $folder_id ),
-			'is_generated'      => $this->is_generated( $folder_id ),
-			'is_orphaned'       => $this->is_orphaned( $folder_id ),
-			'source_post_id'    => $this->source_post_id( $folder_id ),
-			'source_post_type'  => $this->source_post_type( $folder_id ),
+			'is_system_root'   => $this->is_system_root( $folder_id ),
+			'is_generated'     => $this->is_generated( $folder_id ),
+			'is_orphaned'      => $this->is_orphaned( $folder_id ),
+			'source_post_id'   => $this->source_post_id( $folder_id ),
+			'source_post_type' => $this->source_post_type( $folder_id ),
 		];
 	}
 }
