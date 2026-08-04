@@ -3,7 +3,7 @@
 /* List View-style tree geometry: child chevron aligns under parent folder icon. */
 $mm-tree-chevron-left: 2px;
 $mm-tree-icon-left: 26px;
-$mm-tree-nest-step: $mm-tree-icon-left - $mm-tree-chevron-left; // 24px
+$mm-tree-nest-step: $mm-tree-icon-left - $mm-tree-chevron-left;
 $mm-tree-row-padding-left: 52px;
 
 body.media-manager-folders-active.upload-php #wpbody.media-manager-has-folders {
