@@ -2,19 +2,19 @@
  * @fileoverview Media modal adapter E2E coverage.
  */
 
-const { test, expect } = require( '@playwright/test' );
-
-const enabled = !! process.env.MEDIA_MANAGER_E2E;
+const { test, expect } = require( '@wordpress/e2e-test-utils-playwright' );
 
 test.describe( 'Media modal folders', () => {
-	test.skip(
-		! enabled,
-		'Set MEDIA_MANAGER_E2E=1 with a running wp-env to enable browser coverage.'
-	);
-
-	test( 'featured image modal can open with folder mount', async ( { page } ) => {
-		await page.goto( '/wp-admin/post-new.php' );
-		await page.getByRole( 'button', { name: /set featured image/i } ).click();
+	test( 'image block media library modal mounts folder UI', async ( {
+		admin,
+		editor,
+		page,
+	} ) => {
+		await admin.createNewPost();
+		await editor.insertBlock( { name: 'core/image' } );
+		await editor.canvas
+			.getByRole( 'button', { name: 'Media Library' } )
+			.click();
 		await expect( page.locator( '.media-manager-modal-folders' ) ).toBeVisible();
 	} );
 } );

@@ -6,4 +6,5 @@ build/
 .phpunit.result.cache
 /playwright-report/
 /test-results/
+/artifacts/
 /.wp-env.override.json

@@ -218,7 +218,8 @@ class Test_Private_Media extends WP_UnitTestCase {
 		// Simulate an image-editor save that stored the absolute private path.
 		update_post_meta( $attachment, '_wp_attached_file', $private );
 
-		$result = $transitions->leave_private( $attachment, [ (int) $folder->term_id ] );
+		// Leave to Uncategorized — target folders must be public (not the private vault).
+		$result = $transitions->leave_private( $attachment, [] );
 		$this->assertTrue( $result, is_wp_error( $result ) ? $result->get_error_message() : '' );
 		$this->assertFalse( $transitions->is_private( $attachment ) );
 		$this->assertSame(

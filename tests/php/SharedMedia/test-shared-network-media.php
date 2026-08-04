@@ -184,6 +184,10 @@ class Test_Shared_Network_Media extends WP_UnitTestCase {
 			$this->markTestSkipped( 'Multisite required.' );
 		}
 
+		$admin = self::factory()->user->create( [ 'role' => 'administrator' ] );
+		grant_super_admin( $admin );
+		wp_set_current_user( $admin );
+
 		global $submenu;
 		$submenu = []; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
 

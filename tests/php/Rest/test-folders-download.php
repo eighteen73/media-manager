@@ -103,16 +103,17 @@ class Test_Folders_Download extends WP_UnitTestCase {
 
 		$folder     = ( new FolderService() )->create( 'Photos' );
 		$attachment = $this->create_attachment_with_file( 'hero-original.jpg', 'full-size-bytes' );
+		$basename   = wp_basename( (string) get_attached_file( $attachment ) );
 		( new FolderRepository() )->set_attachment_folders( $attachment, [ (int) $folder->term_id ], false );
 
 		// Simulate a crop sibling that must not be included.
 		$meta = [
 			'width'  => 100,
 			'height' => 100,
-			'file'   => 'hero-original.jpg',
+			'file'   => $basename,
 			'sizes'  => [
 				'thumbnail' => [
-					'file'      => 'hero-original-150x150.jpg',
+					'file'      => pathinfo( $basename, PATHINFO_FILENAME ) . '-150x150.jpg',
 					'width'     => 150,
 					'height'    => 150,
 					'mime-type' => 'image/jpeg',
@@ -142,8 +143,8 @@ class Test_Folders_Download extends WP_UnitTestCase {
 		$zip->close();
 		wp_delete_file( $archive['path'] );
 
-		$this->assertContains( 'hero-original.jpg', $names );
-		$this->assertNotContains( 'hero-original-150x150.jpg', $names );
+		$this->assertContains( $basename, $names );
+		$this->assertNotContains( $meta['sizes']['thumbnail']['file'], $names );
 	}
 
 	/**
@@ -165,6 +166,8 @@ class Test_Folders_Download extends WP_UnitTestCase {
 		$repo     = new FolderRepository();
 		$parent_a = $this->create_attachment_with_file( 'parent.jpg', 'parent-bytes' );
 		$child_a  = $this->create_attachment_with_file( 'child.jpg', 'child-bytes' );
+		$parent_b = wp_basename( (string) get_attached_file( $parent_a ) );
+		$child_b  = wp_basename( (string) get_attached_file( $child_a ) );
 		$repo->set_attachment_folders( $parent_a, [ (int) $parent->term_id ], false );
 		$repo->set_attachment_folders( $child_a, [ (int) $child->term_id ], false );
 
@@ -180,8 +183,8 @@ class Test_Folders_Download extends WP_UnitTestCase {
 		$zip->close();
 		wp_delete_file( $archive['path'] );
 
-		$this->assertContains( 'parent.jpg', $names );
-		$this->assertContains( 'child.jpg', $names );
+		$this->assertContains( $parent_b, $names );
+		$this->assertContains( $child_b, $names );
 	}
 
 	/**
@@ -213,6 +216,8 @@ class Test_Folders_Download extends WP_UnitTestCase {
 		$repo    = new FolderRepository();
 		$visible = $this->create_attachment_with_file( 'visible.jpg', 'visible' );
 		$hidden  = $this->create_attachment_with_file( 'hidden.jpg', 'hidden' );
+		$visible_name = wp_basename( (string) get_attached_file( $visible ) );
+		$hidden_name  = wp_basename( (string) get_attached_file( $hidden ) );
 		$repo->set_attachment_folders( $visible, [ (int) $visible_folder->term_id ], false );
 		$repo->set_attachment_folders( $hidden, [ (int) $hidden_folder->term_id ], false );
 
@@ -229,8 +234,8 @@ class Test_Folders_Download extends WP_UnitTestCase {
 		$zip->close();
 		wp_delete_file( $archive['path'] );
 
-		$this->assertContains( 'visible.jpg', $names );
-		$this->assertNotContains( 'hidden.jpg', $names );
+		$this->assertContains( $visible_name, $names );
+		$this->assertNotContains( $hidden_name, $names );
 	}
 
 	/**
@@ -241,6 +246,11 @@ class Test_Folders_Download extends WP_UnitTestCase {
 	 * @return int Attachment ID.
 	 */
 	private function create_attachment_with_file( string $filename, string $contents ): int {
+		// Keep uploads unique so leftover files from prior runs don't rename basenames unexpectedly.
+		$unique   = pathinfo( $filename, PATHINFO_FILENAME ) . '-' . wp_generate_password( 8, false, false );
+		$ext      = pathinfo( $filename, PATHINFO_EXTENSION );
+		$filename = $ext ? $unique . '.' . $ext : $unique;
+
 		$upload = wp_upload_bits( $filename, null, $contents );
 		$this->assertEmpty( $upload['error'], (string) $upload['error'] );
 

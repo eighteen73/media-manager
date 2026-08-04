@@ -39,6 +39,7 @@ class Test_Folder_Tree extends WP_UnitTestCase {
 		parent::set_up();
 		Installer::activate();
 		do_action( 'init' );
+		wp_set_current_user( self::factory()->user->create( [ 'role' => 'administrator' ] ) );
 		$this->service    = new FolderService();
 		$this->repository = new FolderRepository();
 	}
@@ -107,6 +108,7 @@ class Test_Attachment_Query extends WP_UnitTestCase {
 		parent::set_up();
 		Installer::activate();
 		do_action( 'init' );
+		wp_set_current_user( self::factory()->user->create( [ 'role' => 'administrator' ] ) );
 		$this->queries = new AttachmentQuery();
 	}
 

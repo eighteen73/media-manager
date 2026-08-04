@@ -28,7 +28,8 @@
 	},
 	"scripts": {
 		"lint": "./vendor/bin/phpcs",
-		"format": "./vendor/bin/phpcbf"
+		"format": "./vendor/bin/phpcbf",
+		"test": "@php vendor/bin/phpunit -c phpunit.xml.dist"
 	},
 	"config": {
 		"allow-plugins": {
