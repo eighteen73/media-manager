@@ -254,8 +254,7 @@ class TransitionService {
 		foreach ( $files as $relative => $source ) {
 			$real = realpath( $source );
 			if ( $real && is_file( $real ) ) {
-				// phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-				@unlink( $real );
+				wp_delete_file( $real );
 			}
 		}
 
@@ -356,8 +355,7 @@ class TransitionService {
 			$result = $this->storage->copy_to_public( $relative, $dest );
 			if ( is_wp_error( $result ) ) {
 				foreach ( $copied as $path ) {
-					// phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-					@unlink( $path );
+					wp_delete_file( $path );
 				}
 				$this->fail( $attachment_id, $result->get_error_message() );
 				return $result;

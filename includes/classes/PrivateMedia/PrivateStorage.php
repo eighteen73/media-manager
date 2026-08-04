@@ -222,8 +222,9 @@ class PrivateStorage {
 			);
 		}
 
+		// Local private storage; WP_Filesystem may be non-direct and unable to reach the path.
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_copy
-		if ( ! @copy( $source, $destination ) ) {
+		if ( ! copy( $source, $destination ) ) {
 			return new WP_Error(
 				'media_manager_private_copy_failed',
 				__( 'Unable to copy media into private storage.', 'media-manager' ),
@@ -235,8 +236,7 @@ class PrivateStorage {
 		$actual   = filesize( $destination );
 
 		if ( false === $expected || false === $actual || (int) $expected !== (int) $actual ) {
-			// phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-			@unlink( $destination );
+			wp_delete_file( $destination );
 			return new WP_Error(
 				'media_manager_private_verify_failed',
 				__( 'Private storage copy failed verification.', 'media-manager' ),
@@ -246,8 +246,7 @@ class PrivateStorage {
 
 		$real = realpath( $destination );
 		if ( false === $real || ! $this->is_contained( $real ) ) {
-			// phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-			@unlink( $destination );
+			wp_delete_file( $destination );
 			return new WP_Error(
 				'media_manager_private_storage_path',
 				__( 'Private destination failed containment checks.', 'media-manager' ),
@@ -281,8 +280,9 @@ class PrivateStorage {
 			);
 		}
 
+		// Local filesystem copy; WP_Filesystem may be non-direct.
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_copy
-		if ( ! @copy( $source, $dest ) ) {
+		if ( ! copy( $source, $dest ) ) {
 			return new WP_Error(
 				'media_manager_public_copy_failed',
 				__( 'Unable to copy media into public uploads.', 'media-manager' ),
@@ -294,8 +294,7 @@ class PrivateStorage {
 		$actual   = filesize( $dest );
 
 		if ( false === $expected || false === $actual || (int) $expected !== (int) $actual ) {
-			// phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-			@unlink( $dest );
+			wp_delete_file( $dest );
 			return new WP_Error(
 				'media_manager_public_verify_failed',
 				__( 'Public storage copy failed verification.', 'media-manager' ),
@@ -336,8 +335,7 @@ class PrivateStorage {
 			);
 		}
 
-		// phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-		if ( ! @unlink( $real ) ) {
+		if ( ! wp_delete_file( $real ) ) {
 			return new WP_Error(
 				'media_manager_private_delete_failed',
 				__( 'Unable to delete a private media file.', 'media-manager' ),
@@ -420,8 +418,9 @@ class PrivateStorage {
 			}
 
 			if ( ! file_exists( $dest ) ) {
-				// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rename
-				if ( @rename( $source, $dest ) ) {
+				// Same-filesystem local migrate; atomic rename preferred over WP_Filesystem::move().
+				// phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename
+				if ( rename( $source, $dest ) ) {
 					++$moved;
 				}
 			}
