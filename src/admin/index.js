@@ -22,7 +22,10 @@ import {
 	isSharedMediaState,
 } from './adapters/shared-media';
 import { enableFolderDragDrop } from './adapters/drag-drop';
-import { mountUploadFolderSelects } from './adapters/uploader';
+import {
+	mountUploadFolderSelects,
+	observeUploadsForFolderCounts,
+} from './adapters/uploader';
 
 registerStore();
 
@@ -278,6 +281,7 @@ function bootWhenReady() {
 	teardowns.push( registerSharedMediaTab() );
 	bootstrapModals();
 	bootstrapUploadFolderSelect();
+	teardowns.push( observeUploadsForFolderCounts() );
 	teardowns.push( enableFolderDragDrop() );
 
 	const startLibrary = () => {

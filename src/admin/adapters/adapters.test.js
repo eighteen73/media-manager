@@ -9,7 +9,7 @@ import {
 	mountMediaLibrarySidebar,
 	resolveLibraryCollection,
 } from './media-library';
-import { setUploaderFolder, findUploadHosts, ensureUploadSelectMount } from './uploader';
+import { setUploaderFolder, findUploadHosts, ensureUploadSelectMount, observeUploadsForFolderCounts } from './uploader';
 import { observeMediaFrames, ensureModalFolderMount } from './media-modal';
 import { resolveDragAttachmentIds } from './drag-drop';
 
@@ -202,6 +202,147 @@ describe( 'uploader adapter', () => {
 			hosts[ 0 ].querySelector( '.drag-drop-buttons' ).nextSibling
 		).toBe( mount );
 		expect( ensureUploadSelectMount( hosts[ 0 ] ) ).toBe( mount );
+	} );
+
+	describe( 'observeUploadsForFolderCounts', () => {
+		let loadFolders;
+		let queueHandlers;
+		let originalWp;
+
+		beforeEach( () => {
+			jest.useFakeTimers();
+			originalWp = window.wp;
+			loadFolders = jest.fn();
+			queueHandlers = {};
+			window.wp = {
+				data: {
+					dispatch: jest.fn( ( store ) =>
+						store === 'media-manager/folders'
+							? { loadFolders }
+							: {}
+					),
+				},
+				Uploader: {
+					queue: {
+						on: jest.fn( ( event, handler ) => {
+							queueHandlers[ event ] = handler;
+						} ),
+						off: jest.fn( ( event, handler ) => {
+							if ( queueHandlers[ event ] === handler ) {
+								delete queueHandlers[ event ];
+							}
+						} ),
+					},
+				},
+			};
+		} );
+
+		afterEach( () => {
+			jest.useRealTimers();
+			window.wp = originalWp;
+		} );
+
+		it( 'reloads folder counts when an upload finishes', () => {
+			const attachmentHandlers = {};
+			const attachment = {
+				get: jest.fn( ( key ) =>
+					key === 'uploading' ? true : undefined
+				),
+				on: jest.fn( ( event, handler ) => {
+					attachmentHandlers[ event ] = handler;
+				} ),
+			};
+
+			const teardown = observeUploadsForFolderCounts();
+			expect( window.wp.Uploader.queue.on ).toHaveBeenCalledWith(
+				'add',
+				expect.any( Function )
+			);
+
+			queueHandlers.add( attachment );
+			expect( attachment.on ).toHaveBeenCalledWith(
+				'change:uploading',
+				expect.any( Function )
+			);
+			expect( loadFolders ).not.toHaveBeenCalled();
+
+			attachment.get.mockImplementation( ( key ) =>
+				key === 'uploading' ? false : undefined
+			);
+			attachmentHandlers[ 'change:uploading' ]( attachment );
+
+			jest.advanceTimersByTime( 150 );
+			expect( loadFolders ).toHaveBeenCalledTimes( 1 );
+			expect( window.wp.data.dispatch ).toHaveBeenCalledWith(
+				'media-manager/folders'
+			);
+
+			teardown();
+			expect( window.wp.Uploader.queue.off ).toHaveBeenCalledWith(
+				'add',
+				expect.any( Function )
+			);
+		} );
+
+		it( 'reloads folder counts for each finished upload', () => {
+			const makeAttachment = () => {
+				const handlers = {};
+				const attachment = {
+					get: jest.fn( ( key ) =>
+						key === 'uploading' ? true : undefined
+					),
+					on: jest.fn( ( event, handler ) => {
+						handlers[ event ] = handler;
+					} ),
+					triggerFinish() {
+						attachment.get.mockImplementation( ( key ) =>
+							key === 'uploading' ? false : undefined
+						);
+						handlers[ 'change:uploading' ]( attachment );
+					},
+				};
+				return attachment;
+			};
+
+			observeUploadsForFolderCounts();
+
+			const first = makeAttachment();
+			const second = makeAttachment();
+			queueHandlers.add( first );
+			queueHandlers.add( second );
+
+			first.triggerFinish();
+			jest.advanceTimersByTime( 150 );
+			expect( loadFolders ).toHaveBeenCalledTimes( 1 );
+
+			second.triggerFinish();
+			jest.advanceTimersByTime( 150 );
+			expect( loadFolders ).toHaveBeenCalledTimes( 2 );
+		} );
+
+		it( 'reloads immediately when a finished attachment is added', () => {
+			const attachment = {
+				get: jest.fn( ( key ) =>
+					key === 'uploading' ? false : undefined
+				),
+				on: jest.fn(),
+			};
+
+			observeUploadsForFolderCounts();
+			queueHandlers.add( attachment );
+
+			expect( attachment.on ).not.toHaveBeenCalled();
+			jest.advanceTimersByTime( 150 );
+			expect( loadFolders ).toHaveBeenCalledTimes( 1 );
+		} );
+
+		it( 'is a no-op teardown when the upload queue is missing', () => {
+			window.wp = { data: { dispatch: () => ( { loadFolders } ) } };
+			const teardown = observeUploadsForFolderCounts();
+			expect( typeof teardown ).toBe( 'function' );
+			teardown();
+			expect( loadFolders ).not.toHaveBeenCalled();
+		} );
 	} );
 } );
 
