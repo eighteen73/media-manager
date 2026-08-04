@@ -1,10 +1,53 @@
+
+# Operating System files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.idea
+.vscode/*
+
+# Sass
+.sass-cache/
+
+# Logs
+logs/
+
+# Environment files
+wp-cli.local.yml
+yarn-error.log
+npm-debug.log
+.pnpm-debug.log
+
+# Build files
+*.sql
+*.swp
+*.zip
+
+# Built packages
+build/
+build-module/
+build-style/
+build-types/
+dist/
+
+# Project files
 node_modules/
 vendor/
-build/
-.DS_Store
-*.zip
+
+# TypeScript files
+tsconfig.tsbuildinfo
+
+# wp-env config
+.wp-env.override.json
+
+# Unit tests
+tmp/
 .phpunit.result.cache
-/playwright-report/
-/test-results/
-/artifacts/
-/.wp-env.override.json
+artifacts/
+test-results/
+
+# Composer
+vendor/
+bin/composer/**/vendor/
+lib/vendor/
