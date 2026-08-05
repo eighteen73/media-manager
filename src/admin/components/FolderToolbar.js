@@ -19,7 +19,7 @@ import { __ } from '@wordpress/i18n';
  * @param {boolean}  props.canDelete    Whether delete is allowed for selection.
  * @return {JSX.Element} Toolbar.
  */
-export default function FolderToolbar( {
+export default function FolderToolbar({
 	capabilities,
 	sort,
 	onSort,
@@ -29,71 +29,69 @@ export default function FolderToolbar( {
 	onDelete,
 	hasSelection,
 	canDelete = true,
-} ) {
+}) {
 	const actionsClass = hasSelection ? '' : ' is-disabled';
-	const deleteClass =
-		hasSelection && canDelete ? '' : ' is-disabled';
+	const deleteClass = hasSelection && canDelete ? '' : ' is-disabled';
 
 	return (
 		<>
 			<div className="media-manager-sidebar__header">
 				<h1 className="wp-heading-inline">
-					{ __( 'Folders', 'media-manager' ) }
+					{__('Folders', 'media-manager')}
 				</h1>
-				{ capabilities.edit && (
+				{capabilities.edit && (
 					<button
 						type="button"
 						className="button media-manager-add-folder"
-						onClick={ onCreate }
+						onClick={onCreate}
 					>
-						{ __( 'Add Folder', 'media-manager' ) }
+						{__('Add Folder', 'media-manager')}
 					</button>
-				) }
+				)}
 			</div>
 			<div className="media-manager-sidebar__toolbar">
 				<div className="media-manager-folder-actions">
-					{ capabilities.edit && (
+					{capabilities.edit && (
 						<button
 							type="button"
-							className={ `media-manager-edit-folder${ actionsClass }` }
-							onClick={ onRename }
-							disabled={ ! hasSelection }
-							title={ __( 'Edit folder', 'media-manager' ) }
-							aria-label={ __( 'Edit folder', 'media-manager' ) }
+							className={`media-manager-edit-folder${actionsClass}`}
+							onClick={onRename}
+							disabled={!hasSelection}
+							title={__('Edit folder', 'media-manager')}
+							aria-label={__('Edit folder', 'media-manager')}
 						/>
-					) }
-					{ capabilities.view && (
+					)}
+					{capabilities.view && (
 						<button
 							type="button"
-							className={ `media-manager-download-folder${ actionsClass }` }
-							onClick={ onDownload }
-							disabled={ ! hasSelection }
-							title={ __( 'Download folder', 'media-manager' ) }
-							aria-label={ __( 'Download folder', 'media-manager' ) }
+							className={`media-manager-download-folder${actionsClass}`}
+							onClick={onDownload}
+							disabled={!hasSelection}
+							title={__('Download folder', 'media-manager')}
+							aria-label={__('Download folder', 'media-manager')}
 						/>
-					) }
-					{ capabilities.delete && (
+					)}
+					{capabilities.delete && (
 						<button
 							type="button"
-							className={ `media-manager-delete-folder${ deleteClass }` }
-							onClick={ onDelete }
-							disabled={ ! hasSelection || ! canDelete }
-							title={ __( 'Delete folder', 'media-manager' ) }
-							aria-label={ __( 'Delete folder', 'media-manager' ) }
+							className={`media-manager-delete-folder${deleteClass}`}
+							onClick={onDelete}
+							disabled={!hasSelection || !canDelete}
+							title={__('Delete folder', 'media-manager')}
+							aria-label={__('Delete folder', 'media-manager')}
 						/>
-					) }
+					)}
 				</div>
 				<select
 					id="media-manager-sort-folders"
-					value={ sort || '' }
-					onChange={ ( event ) => onSort( event.target.value ) }
+					value={sort || ''}
+					onChange={(event) => onSort(event.target.value)}
 				>
-					<option value="">
-						{ __( 'Sort by', 'media-manager' ) }
-					</option>
+					<option value="">{__('Sort by', 'media-manager')}</option>
 					<option value="a-z">A → Z</option>
+					<option value="z-a">Z → A</option>
 					<option value="count">
-						{ __( 'Media count', 'media-manager' ) }
+						{__('Media count', 'media-manager')}
 					</option>
 				</select>
 			</div>

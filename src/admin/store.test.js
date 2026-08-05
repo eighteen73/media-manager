@@ -50,6 +50,45 @@ describe( 'sortTree', () => {
 			'Zebra',
 		] );
 	} );
+
+	it( 'sorts Z → A while keeping system roots first', () => {
+		const tree = [
+			{ id: 1, name: 'Zebra', is_system_root: false, children: [] },
+			{ id: 2, name: 'Posts', is_system_root: true, children: [] },
+			{ id: 3, name: 'Alpha', is_system_root: false, children: [] },
+			{ id: 4, name: 'Pages', is_system_root: true, children: [] },
+		];
+
+		const sorted = sortTree( tree, 'z-a' );
+		expect( sorted.map( ( node ) => node.name ) ).toEqual( [
+			'Posts',
+			'Pages',
+			'Zebra',
+			'Alpha',
+		] );
+	} );
+
+	it( 'sorts nested children Z → A', () => {
+		const tree = [
+			{
+				id: 1,
+				name: 'Parent',
+				is_system_root: false,
+				children: [
+					{ id: 2, name: 'Charlie', children: [] },
+					{ id: 3, name: 'Alpha', children: [] },
+					{ id: 4, name: 'Bravo', children: [] },
+				],
+			},
+		];
+
+		const sorted = sortTree( tree, 'z-a' );
+		expect( sorted[ 0 ].children.map( ( node ) => node.name ) ).toEqual( [
+			'Charlie',
+			'Bravo',
+			'Alpha',
+		] );
+	} );
 } );
 
 describe( 'reducer', () => {

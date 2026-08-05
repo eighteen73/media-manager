@@ -60,7 +60,7 @@ export function filterTree(nodes, query) {
 }
 
 /**
- * Sort a folder tree by name or count without destroying hierarchy.
+ * Sort a folder tree by name (A–Z / Z–A) or count without destroying hierarchy.
  * Top-level system roots stay first (then user folders); each group uses the active sort.
  *
  * @param {Array}  nodes Folder nodes.
@@ -78,6 +78,9 @@ export function sortTree(nodes, sort, depth = 0) {
 		if (sort === 'count') {
 			return b.count - a.count || a.name.localeCompare(b.name) || a.id - b.id;
 		}
+		if (sort === 'z-a') {
+			return b.name.localeCompare(a.name) || a.id - b.id;
+		}
 		if (sort === 'a-z' || sort === '') {
 			return a.name.localeCompare(b.name) || a.id - b.id;
 		}
@@ -90,7 +93,7 @@ export function sortTree(nodes, sort, depth = 0) {
 		return [...system, ...user];
 	}
 
-	if (sort === 'count' || sort === 'a-z') {
+	if (sort === 'count' || sort === 'a-z' || sort === 'z-a') {
 		list.sort(compare);
 	}
 
