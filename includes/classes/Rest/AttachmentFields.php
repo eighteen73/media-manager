@@ -50,6 +50,7 @@ class AttachmentFields {
 	public function register(): void {
 		add_action( 'rest_api_init', [ $this, 'register_fields' ] );
 		add_filter( 'rest_prepare_attachment', [ $this, 'filter_prepare_attachment' ], 20, 3 );
+		add_filter( 'wp_prepare_attachment_for_js', [ $this, 'prepare_attachment_for_js' ], 20, 3 );
 	}
 
 	/**
@@ -126,6 +127,29 @@ class AttachmentFields {
 				[ 'status' => 403 ]
 			);
 		}
+
+		return $response;
+	}
+
+	/**
+	 * Expose visible folder IDs and private flag on media JS models.
+	 *
+	 * @param array      $response   Attachment data for JS.
+	 * @param \WP_Post   $attachment Attachment post.
+	 * @param array|null $meta       Attachment meta (unused).
+	 * @return array
+	 */
+	public function prepare_attachment_for_js( $response, $attachment, $meta = null ) {
+		unset( $meta );
+
+		if ( ! is_array( $response ) || ! $attachment instanceof \WP_Post ) {
+			return $response;
+		}
+
+		$id = (int) $attachment->ID;
+
+		$response['media_manager_folders']    = $id > 0 ? $this->acl->visible_attachment_folder_ids( $id ) : [];
+		$response['media_manager_is_private'] = $id > 0 && $this->transitions->is_private( $id );
 
 		return $response;
 	}

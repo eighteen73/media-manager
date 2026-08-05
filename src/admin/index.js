@@ -17,6 +17,8 @@ import {
 	subscribeToSelection,
 	ensureModalFolderMount,
 } from './adapters/media-modal';
+import { observeAttachmentDetails } from './adapters/attachment-details';
+import AttachmentFolderField from './components/AttachmentFolderField';
 import {
 	registerSharedMediaTab,
 	isSharedMediaState,
@@ -270,6 +272,42 @@ function bootstrapUploadFolderSelect() {
 }
 
 /**
+ * Mount the Folders field on the classic attachment edit metabox.
+ */
+function bootstrapAttachmentEdit() {
+	const root = document.getElementById( 'media-manager-attachment-folders' );
+	if ( ! root || ! boot.capabilities?.assign ) {
+		return;
+	}
+
+	const attachmentId = Number( root.dataset.attachmentId || 0 );
+	let folderIds = [];
+	try {
+		folderIds = JSON.parse( root.dataset.folderIds || '[]' );
+	} catch ( _err ) {
+		folderIds = [];
+	}
+	if ( ! Array.isArray( folderIds ) ) {
+		folderIds = [];
+	}
+	folderIds = folderIds.map( Number ).filter( ( id ) => id > 0 );
+
+	const reactRoot = createRoot( root );
+	reactRoot.render(
+		<AttachmentFolderField
+			attachmentId={ attachmentId }
+			folderIds={ folderIds }
+			canAssign
+			layout="metabox"
+			onFoldersChange={ ( next ) => {
+				root.dataset.folderIds = JSON.stringify( next );
+			} }
+		/>
+	);
+	teardowns.push( () => reactRoot.unmount() );
+}
+
+/**
  * Boot once. admin_footer prints the mount node before footer scripts.
  */
 function bootWhenReady() {
@@ -280,7 +318,9 @@ function bootWhenReady() {
 
 	teardowns.push( registerSharedMediaTab() );
 	bootstrapModals();
+	teardowns.push( observeAttachmentDetails() );
 	bootstrapUploadFolderSelect();
+	bootstrapAttachmentEdit();
 	teardowns.push( observeUploadsForFolderCounts() );
 	teardowns.push( enableFolderDragDrop() );
 

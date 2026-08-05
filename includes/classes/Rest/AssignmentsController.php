@@ -105,13 +105,21 @@ class AssignmentsController extends WP_REST_Controller {
 						],
 						'folder_id'      => [
 							'type'              => 'integer',
-							'required'          => true,
+							'required'          => false,
+							'default'           => 0,
 							'sanitize_callback' => 'absint',
+						],
+						'folder_ids'     => [
+							'type'              => 'array',
+							'required'          => false,
+							'default'           => [],
+							'items'             => [ 'type' => 'integer' ],
+							'sanitize_callback' => [ $this, 'sanitize_attachment_ids' ],
 						],
 						'mode'           => [
 							'type'              => 'string',
 							'required'          => true,
-							'enum'              => [ 'add', 'move' ],
+							'enum'              => [ 'add', 'move', 'set' ],
 							'sanitize_callback' => 'sanitize_key',
 						],
 						'confirm'        => [
@@ -146,7 +154,7 @@ class AssignmentsController extends WP_REST_Controller {
 	}
 
 	/**
-	 * Sanitize attachment IDs.
+	 * Sanitize attachment or folder ID lists.
 	 *
 	 * @param mixed $value Raw value.
 	 * @return int[]
@@ -173,7 +181,6 @@ class AssignmentsController extends WP_REST_Controller {
 	 */
 	public function create_item( $request ) {
 		$attachment_ids = $request->get_param( 'attachment_ids' );
-		$folder_id      = (int) $request->get_param( 'folder_id' );
 		$mode           = (string) $request->get_param( 'mode' );
 		$confirm        = (bool) $request->get_param( 'confirm' );
 
@@ -197,46 +204,22 @@ class AssignmentsController extends WP_REST_Controller {
 			);
 		}
 
-		if ( 'add' === $mode && $folder_id < 1 ) {
-			return new WP_Error(
-				'media_manager_invalid_folder',
-				__( 'Choose a folder when adding media.', 'media-manager' ),
-				[ 'status' => 400 ]
+		if ( 'set' === $mode ) {
+			$resolved = $this->resolve_set_folders( $request->get_param( 'folder_ids' ) );
+		} else {
+			$resolved = $this->resolve_single_folder(
+				(int) $request->get_param( 'folder_id' ),
+				$mode
 			);
 		}
 
-		$target_private = false;
-
-		if ( $folder_id > 0 ) {
-			$folder = $this->repository->find( $folder_id );
-
-			if ( is_wp_error( $folder ) ) {
-				return $folder;
-			}
-
-			if ( ! $this->access->can_access_folder( $folder_id ) ) {
-				return new WP_Error(
-					'media_manager_forbidden_folder',
-					__( 'You cannot assign media to that folder.', 'media-manager' ),
-					[ 'status' => 403 ]
-				);
-			}
-
-			$policy = $this->policy->get_effective( $folder_id );
-			if ( is_wp_error( $policy ) ) {
-				return $policy;
-			}
-
-			$target_private = ! empty( $policy['is_private'] );
-
-			if ( $target_private && 'add' === $mode ) {
-				return new WP_Error(
-					'media_manager_private_requires_move',
-					__( 'Private folders are exclusive. Use Move instead of Add.', 'media-manager' ),
-					[ 'status' => 400 ]
-				);
-			}
+		if ( is_wp_error( $resolved ) ) {
+			return $resolved;
 		}
+
+		$folder_ids     = $resolved['folder_ids'];
+		$folder_id      = $resolved['folder_id'];
+		$target_private = $resolved['target_private'];
 
 		$errors      = [];
 		$needs_enter = false;
@@ -307,13 +290,12 @@ class AssignmentsController extends WP_REST_Controller {
 			if ( $target_private ) {
 				$result = $this->transitions->enter_private( $attachment_id, $folder_id );
 			} elseif ( $is_private ) {
-				$ids    = $folder_id > 0 ? [ $folder_id ] : [];
-				$result = $this->transitions->leave_private( $attachment_id, $ids );
+				$result = $this->transitions->leave_private( $attachment_id, $folder_ids );
 			} elseif ( 'add' === $mode ) {
 				$result = $this->repository->set_attachment_folders( $attachment_id, [ $folder_id ], true );
 			} else {
-				$ids    = $folder_id > 0 ? [ $folder_id ] : [];
-				$result = $this->repository->set_attachment_folders( $attachment_id, $ids, false );
+				// move or set (public / empty).
+				$result = $this->repository->set_attachment_folders( $attachment_id, $folder_ids, false );
 			}
 
 			if ( is_wp_error( $result ) ) {
@@ -334,13 +316,131 @@ class AssignmentsController extends WP_REST_Controller {
 
 		AclCache::invalidate_site();
 
-		return rest_ensure_response(
-			[
-				'assigned'       => true,
-				'attachment_ids' => $attachment_ids,
-				'folder_id'      => $folder_id,
-				'mode'           => $target_private ? 'move' : $mode,
-			]
-		);
+		$response = [
+			'assigned'       => true,
+			'attachment_ids' => $attachment_ids,
+			'mode'           => $target_private ? ( 'set' === $mode ? 'set' : 'move' ) : $mode,
+			'folder_ids'     => $folder_ids,
+		];
+
+		if ( 'set' !== $mode ) {
+			$response['folder_id'] = $folder_id;
+		}
+
+		return rest_ensure_response( $response );
+	}
+
+	/**
+	 * Resolve folder targets for add/move modes.
+	 *
+	 * @param int    $folder_id Folder ID (0 = uncategorized for move).
+	 * @param string $mode      add|move.
+	 * @return array{folder_ids: int[], folder_id: int, target_private: bool}|WP_Error
+	 */
+	private function resolve_single_folder( int $folder_id, string $mode ) {
+		if ( 'add' === $mode && $folder_id < 1 ) {
+			return new WP_Error(
+				'media_manager_invalid_folder',
+				__( 'Choose a folder when adding media.', 'media-manager' ),
+				[ 'status' => 400 ]
+			);
+		}
+
+		$target_private = false;
+
+		if ( $folder_id > 0 ) {
+			$validated = $this->validate_folder_access( $folder_id );
+			if ( is_wp_error( $validated ) ) {
+				return $validated;
+			}
+
+			$target_private = $validated;
+
+			if ( $target_private && 'add' === $mode ) {
+				return new WP_Error(
+					'media_manager_private_requires_move',
+					__( 'Private folders are exclusive. Use Move instead of Add.', 'media-manager' ),
+					[ 'status' => 400 ]
+				);
+			}
+		}
+
+		$folder_ids = $folder_id > 0 ? [ $folder_id ] : [];
+
+		return [
+			'folder_ids'     => $folder_ids,
+			'folder_id'      => $folder_id,
+			'target_private' => $target_private,
+		];
+	}
+
+	/**
+	 * Resolve folder targets for set (replace) mode.
+	 *
+	 * @param mixed $raw_folder_ids Raw folder_ids param.
+	 * @return array{folder_ids: int[], folder_id: int, target_private: bool}|WP_Error
+	 */
+	private function resolve_set_folders( $raw_folder_ids ) {
+		$folder_ids  = $this->sanitize_attachment_ids( $raw_folder_ids );
+		$private_ids = [];
+
+		foreach ( $folder_ids as $folder_id ) {
+			$validated = $this->validate_folder_access( $folder_id );
+			if ( is_wp_error( $validated ) ) {
+				return $validated;
+			}
+
+			if ( $validated ) {
+				$private_ids[] = $folder_id;
+			}
+		}
+
+		$private_count = count( $private_ids );
+
+		if ( $private_count > 1 || ( 1 === $private_count && count( $folder_ids ) > 1 ) ) {
+			return new WP_Error(
+				'media_manager_private_exclusive',
+				__( 'Private folders are exclusive. Choose a single private folder, or only public folders.', 'media-manager' ),
+				[ 'status' => 400 ]
+			);
+		}
+
+		$target_private = 1 === $private_count;
+		$folder_id      = $target_private ? (int) $private_ids[0] : ( $folder_ids[0] ?? 0 );
+
+		return [
+			'folder_ids'     => $folder_ids,
+			'folder_id'      => $folder_id,
+			'target_private' => $target_private,
+		];
+	}
+
+	/**
+	 * Ensure a folder exists and is accessible. Returns whether it is private.
+	 *
+	 * @param int $folder_id Folder term ID.
+	 * @return bool|WP_Error True when private, false when public, WP_Error on failure.
+	 */
+	private function validate_folder_access( int $folder_id ) {
+		$folder = $this->repository->find( $folder_id );
+
+		if ( is_wp_error( $folder ) ) {
+			return $folder;
+		}
+
+		if ( ! $this->access->can_access_folder( $folder_id ) ) {
+			return new WP_Error(
+				'media_manager_forbidden_folder',
+				__( 'You cannot assign media to that folder.', 'media-manager' ),
+				[ 'status' => 403 ]
+			);
+		}
+
+		$policy = $this->policy->get_effective( $folder_id );
+		if ( is_wp_error( $policy ) ) {
+			return $policy;
+		}
+
+		return ! empty( $policy['is_private'] );
 	}
 }

@@ -183,19 +183,26 @@ export function triggerBlobDownload(blob, filename) {
 /**
  * Assign attachments to a folder.
  *
- * @param {{ attachmentIds: number[], folderId: number, mode: 'add'|'move', confirm?: boolean }} data Assignment payload.
+ * @param {{ attachmentIds: number[], folderId?: number, folderIds?: number[], mode: 'add'|'move'|'set', confirm?: boolean }} data Assignment payload.
  * @return {Promise<Object>} Assignment response.
  */
 export async function assignAttachments(data) {
+	const payload = {
+		attachment_ids: data.attachmentIds,
+		mode: data.mode,
+		confirm: !!data.confirm,
+	};
+
+	if (data.mode === 'set') {
+		payload.folder_ids = Array.isArray(data.folderIds) ? data.folderIds : [];
+	} else {
+		payload.folder_id = data.folderId;
+	}
+
 	return apiFetch({
 		path: `${ROOT}/assignments`,
 		method: 'POST',
-		data: {
-			attachment_ids: data.attachmentIds,
-			folder_id: data.folderId,
-			mode: data.mode,
-			confirm: !!data.confirm,
-		},
+		data: payload,
 	});
 }
 

@@ -46,25 +46,53 @@ class Assets {
 	}
 
 	/**
-	 * Enqueue assets on Media Library screens.
+	 * Enqueue assets on Media Library and attachment edit screens.
 	 *
 	 * @param string $hook_suffix Current admin page.
 	 * @return void
 	 */
 	public function enqueue( string $hook_suffix ): void {
-		$can_view        = $this->access->can_view_folders();
-		$media_screens   = [ 'upload.php', 'media-new.php' ];
-		$is_media_screen = in_array( $hook_suffix, $media_screens, true );
+		$can_view = $this->access->can_view_folders();
 
 		if ( ! $can_view ) {
 			return;
 		}
 
-		if ( ! $is_media_screen ) {
+		$media_screens   = [ 'upload.php', 'media-new.php' ];
+		$is_media_screen = in_array( $hook_suffix, $media_screens, true );
+		$is_attachment   = $this->is_attachment_edit_screen( $hook_suffix );
+
+		if ( ! $is_media_screen && ! $is_attachment ) {
 			return;
 		}
 
 		$this->enqueue_bundle();
+	}
+
+	/**
+	 * Whether the current screen is editing an attachment.
+	 *
+	 * @param string $hook_suffix Current admin page.
+	 * @return bool
+	 */
+	private function is_attachment_edit_screen( string $hook_suffix ): bool {
+		if ( ! in_array( $hook_suffix, [ 'post.php', 'post-new.php' ], true ) ) {
+			return false;
+		}
+
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( $screen && isset( $screen->post_type ) && 'attachment' === $screen->post_type ) {
+			return true;
+		}
+
+		if ( isset( $_GET['post'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$post_id = absint( wp_unslash( $_GET['post'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			if ( $post_id > 0 && 'attachment' === get_post_type( $post_id ) ) {
+				return true;
+			}
+		}
+
+		return isset( $_GET['post_type'] ) && 'attachment' === sanitize_key( wp_unslash( $_GET['post_type'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 	}
 
 	/**

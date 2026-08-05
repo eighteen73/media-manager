@@ -711,3 +711,186 @@ $mm-modal-sidebar-width: 280px;
 .uploader-inline-content .media-manager-upload-folder {
 	margin-top: 16px;
 }
+
+/* Attachment details / edit screen folder checklist. */
+.attachment-details .media-manager-attachment-folders-root {
+	display: contents;
+}
+
+/* Modal: match core attachment .setting inputs (white box, border, radius, scroll). */
+.media-manager-attachment-folders--modal .media-manager-folder-checklist-wrap {
+	box-sizing: border-box;
+	float: right;
+	width: 65%;
+}
+
+.media-manager-attachment-folders--modal.setting .media-manager-folder-checklist {
+	background: #fff;
+	border: 1px solid #8c8f94;
+	border-radius: 4px;
+	box-sizing: border-box;
+	height: 10em;
+	min-height: 6em;
+	overflow: auto;
+	padding: 6px 8px;
+	resize: vertical;
+	width: 100%;
+}
+
+.media-manager-attachment-folders--modal .media-manager-attachment-folders__status,
+.media-manager-attachment-folders--modal .media-manager-attachment-folders__notice,
+.media-manager-attachment-folders--modal .media-manager-attachment-folders__error {
+	clear: none;
+	margin: 6px 0 0;
+}
+
+.media-manager-attachment-folders--modal .categorychecklist,
+.media-manager-attachment-folders--modal .checklist {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.media-manager-attachment-folders--modal .categorychecklist ul.children,
+.media-manager-attachment-folders--modal .checklist ul.children {
+	list-style: none;
+	margin-left: 14px;
+	padding: 0;
+}
+
+.media-manager-attachment-folders--modal .categorychecklist li,
+.media-manager-attachment-folders--modal .checklist li {
+	line-height: 1.5;
+	margin: 0;
+	padding: 2px 0;
+}
+
+/* Override .attachment-details .setting span { float; min-width: 30%; text-align: right }. */
+.media-manager-attachment-folders--modal .categorychecklist label,
+.media-manager-attachment-folders--modal .checklist label {
+	align-items: center;
+	box-sizing: border-box;
+	color: #1d2327;
+	display: flex;
+	float: none;
+	font-size: 13px;
+	font-style: normal;
+	font-weight: 400;
+	gap: 6px;
+	line-height: 1.4;
+	margin: 0;
+	min-height: 0;
+	padding: 0;
+	text-align: left;
+	width: 100%;
+}
+
+.media-manager-attachment-folders--modal .categorychecklist input[type="checkbox"],
+.media-manager-attachment-folders--modal .checklist input[type="checkbox"] {
+	float: none !important;
+	flex: 0 0 auto;
+	height: 1rem;
+	margin: 0 !important;
+	max-width: none;
+	padding: 0;
+	position: static;
+	width: 1rem;
+}
+
+.media-manager-attachment-folders--modal .categorychecklist span,
+.media-manager-attachment-folders--modal .checklist span,
+.media-manager-attachment-folders--modal .media-manager-folder-checklist__label {
+	color: inherit;
+	display: inline;
+	float: none !important;
+	font-size: inherit;
+	font-weight: 400;
+	line-height: inherit;
+	margin: 0 !important;
+	max-width: none;
+	min-height: 0 !important;
+	min-width: 0 !important;
+	overflow-wrap: normal;
+	padding: 0 !important;
+	text-align: left !important;
+	width: auto !important;
+}
+
+.media-manager-attachment-folders--modal .media-manager-folder-checklist__label {
+	flex: 1 1 auto;
+}
+
+/* Edit screen metabox: native category checklist (no create / no search). */
+#media-manager-folders-metabox .inside {
+	margin: 0;
+	padding: 0 12px 12px;
+}
+
+.media-manager-attachment-folders--metabox {
+	margin: 0;
+}
+
+/* Beat core `.categorydiv div.tabs-panel` (border + padding). */
+#media-manager-folders-metabox .categorydiv div.tabs-panel {
+	background: transparent;
+	border: none;
+	box-sizing: border-box;
+	max-height: 200px;
+	min-height: 42px;
+	overflow: auto;
+	padding: 0;
+}
+
+.media-manager-attachment-folders--metabox .categorychecklist {
+	list-style: none;
+	margin: 0;
+	padding: 8px 0;
+}
+
+.media-manager-attachment-folders--metabox .categorychecklist ul.children {
+	list-style: none;
+	margin-left: 14px;
+	padding: 0;
+}
+
+.media-manager-attachment-folders--metabox .categorychecklist li {
+	margin: 0;
+	padding: 2px 0;
+}
+
+.media-manager-attachment-folders--metabox .categorychecklist label {
+	align-items: center;
+	display: inline-flex;
+	gap: 6px;
+	line-height: 1.4;
+	margin: 0;
+	vertical-align: middle;
+}
+
+.media-manager-attachment-folders--metabox .categorychecklist input[type="checkbox"] {
+	flex: 0 0 auto;
+	margin: 0;
+}
+
+.media-manager-attachment-folders--metabox .media-manager-attachment-folders__status,
+.media-manager-attachment-folders--metabox .media-manager-attachment-folders__notice,
+.media-manager-attachment-folders--metabox .media-manager-attachment-folders__error {
+	margin: 8px 0 0;
+}
+
+.media-manager-folder-checklist__private {
+	color: #646970;
+	font-size: 12px;
+}
+
+.media-manager-attachment-folders__status,
+.media-manager-attachment-folders__notice.description {
+	clear: both;
+	margin: 6px 0 0;
+}
+
+.media-manager-attachment-folders__error {
+	clear: both;
+	color: #b32d2e;
+	margin: 6px 0 0;
+}
