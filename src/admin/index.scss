@@ -58,8 +58,8 @@ body.media-manager-folders-active.upload-php
 }
 
 #media-manager-handler:hover::before {
-	background-color: #2271b1;
-	box-shadow: 1px 0 #2271b1;
+	background-color: var(--wp-admin-theme-color);
+	box-shadow: 1px 0 var(--wp-admin-theme-color);
 }
 
 .media-manager-sidebar {
@@ -150,7 +150,7 @@ body.media-manager-folders-active.upload-php
 }
 
 .media-manager-folder-actions button::before {
-	color: #c3c4c7;
+	color: #a7aaad;
 	display: inline-block;
 	font: normal 20px/1 dashicons;
 	vertical-align: middle;
@@ -229,8 +229,8 @@ body.media-manager-folders-active.upload-php
 }
 
 .media-manager-search input.search:focus {
-	border-color: #2271b1;
-	box-shadow: 0 0 0 1px #2271b1;
+	border-color: var(--wp-admin-theme-color);
+	box-shadow: 0 0 0 1px var(--wp-admin-theme-color);
 	outline: 2px solid transparent;
 }
 
@@ -294,7 +294,7 @@ body.media-manager-folders-active.upload-php
 }
 
 .media-manager-folder-nav.is-current .media-manager-folder-nav__badge {
-	color: #2271b1;
+	color: var(--wp-admin-theme-color);
 }
 
 .media-manager-folder-nav::before {
@@ -318,8 +318,8 @@ body.media-manager-folders-active.upload-php
 }
 
 .media-manager-folder-nav.is-current {
-	color: #2271b1;
-	background-color: #f0f6fc;
+	color: var(--wp-admin-theme-color);
+	background-color: rgb(from var(--wp-admin-theme-color) r g b / 0.1);
 }
 
 .media-manager-folder-nav.is-current::before {
@@ -335,7 +335,7 @@ body.media-manager-folders-active.upload-php
 
 .media-manager-folder-nav.is-drop-target,
 .media-manager-folder-nav.media-manager-folder-nav--drop {
-	outline: 1px dashed #2271b1;
+	outline: 1px dashed var(--wp-admin-theme-color);
 }
 
 .media-manager-attachment-dragging {
@@ -396,7 +396,7 @@ body.media-manager-folders-active.upload-php
 .media-manager-folder-nav--has-children.is-current
 	.media-manager-folder-nav__open-close
 	svg {
-	fill: #2271b1;
+	fill: var(--wp-admin-theme-color);
 }
 
 .media-manager-folder-nav__count {
@@ -420,7 +420,7 @@ body.media-manager-folders-active.upload-php
 
 .media-manager-folder-nav.is-current .media-manager-folder-nav__count {
 	border-color: #c3c4c7;
-	color: #2271b1;
+	color: var(--wp-admin-theme-color);
 }
 
 .media-manager-folders-ul--tree .media-manager-folder-nav {
