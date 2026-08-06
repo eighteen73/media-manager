@@ -13,6 +13,7 @@ import {
 	setCollectionFolder,
 	resolveLibraryCollection,
 	refreshVisibleMedia,
+	clampSidebarWidth,
 } from '../adapters/media-library';
 import { syncFrameUploader } from '../adapters/uploader';
 
@@ -208,7 +209,21 @@ export default function FolderSidebar({
 		(selectedFolderNode?.is_generated && !selectedFolderNode?.is_orphaned)
 	);
 
-	const width = preferences.sidebar_width || 300;
+	const width = clampSidebarWidth(preferences.sidebar_width || 300);
+
+	useEffect(() => {
+		if (compact) {
+			return undefined;
+		}
+
+		const root = document.getElementById('media-manager-folder-root');
+		if (!root) {
+			return undefined;
+		}
+
+		root.style.width = `${width}px`;
+		return undefined;
+	}, [compact, width]);
 
 	return (
 		<aside
@@ -217,7 +232,6 @@ export default function FolderSidebar({
 					? 'media-manager-sidebar is-compact'
 					: 'media-manager-sidebar'
 			}
-			style={compact ? undefined : { width: `${width}px` }}
 			aria-label={__('Media folders', 'media-manager')}
 			data-width={width}
 		>

@@ -244,6 +244,20 @@ export function refreshVisibleMedia(frame = null) {
 }
 
 /**
+ * Clamp Media Library sidebar width to the resizable range.
+ *
+ * @param {number} width Preferred width.
+ * @return {number} Clamped width.
+ */
+export function clampSidebarWidth(width) {
+	const value = Number(width);
+	if (!Number.isFinite(value) || value <= 0) {
+		return 300;
+	}
+	return Math.min(500, Math.max(250, value));
+}
+
+/**
  * Mount the Media Library sidebar root into #wpbody with a resize handle.
  *
  * @param {{ root: HTMLElement, store?: Object }} options Mount options.
@@ -261,8 +275,13 @@ export function mountMediaLibrarySidebar({ root }) {
 		return () => {};
 	}
 
+	const preferredWidth = clampSidebarWidth(
+		window.mediaManagerAdmin?.preferences?.sidebar_width
+	);
+
 	root.hidden = false;
 	root.classList.add('media-manager-folder-root--mounted');
+	root.style.width = `${preferredWidth}px`;
 	host.classList.add('media-manager-has-folders');
 	document.body.classList.add('media-manager-folders-active');
 
@@ -281,21 +300,16 @@ export function mountMediaLibrarySidebar({ root }) {
 
 	const onMouseDown = (event) => {
 		event.preventDefault();
-		const sidebar = root.querySelector('.media-manager-sidebar');
-		if (!sidebar) {
-			return;
-		}
 
 		const startX = event.clientX;
-		const startWidth = sidebar.getBoundingClientRect().width;
+		const startWidth = root.getBoundingClientRect().width;
 		let latest = startWidth;
 
 		const onMove = (moveEvent) => {
-			latest = Math.min(
-				500,
-				Math.max(250, startWidth + (moveEvent.clientX - startX))
+			latest = clampSidebarWidth(
+				startWidth + (moveEvent.clientX - startX)
 			);
-			sidebar.style.width = `${latest}px`;
+			root.style.width = `${latest}px`;
 		};
 
 		const onUp = () => {
@@ -318,6 +332,7 @@ export function mountMediaLibrarySidebar({ root }) {
 		handler.removeEventListener('mousedown', onMouseDown);
 		root.hidden = true;
 		root.classList.remove('media-manager-folder-root--mounted');
+		root.style.width = '';
 		host.classList.remove('media-manager-has-folders');
 		document.body.classList.remove('media-manager-folders-active');
 		handler.remove();

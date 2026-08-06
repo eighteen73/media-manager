@@ -8,6 +8,7 @@ import {
 	ensureLibraryObservesUploads,
 	mountMediaLibrarySidebar,
 	resolveLibraryCollection,
+	clampSidebarWidth,
 } from './media-library';
 import { setUploaderFolder, findUploadHosts, ensureUploadSelectMount, observeUploadsForFolderCounts } from './uploader';
 import { observeMediaFrames, ensureModalFolderMount } from './media-modal';
@@ -18,6 +19,13 @@ beforeAll( () => {
 } );
 
 describe( 'media library adapters', () => {
+	it( 'clamps sidebar width to the resizable range', () => {
+		expect( clampSidebarWidth( undefined ) ).toBe( 300 );
+		expect( clampSidebarWidth( 180 ) ).toBe( 250 );
+		expect( clampSidebarWidth( 320 ) ).toBe( 320 );
+		expect( clampSidebarWidth( 800 ) ).toBe( 500 );
+	} );
+
 	it( 'serializes folder selections', () => {
 		expect( serializeFolderId( null ) ).toBe( 'all' );
 		expect( serializeFolderId( 0 ) ).toBe( 0 );
@@ -114,12 +122,19 @@ describe( 'media library adapters', () => {
 	} );
 
 	it( 'mounts and tears down the sidebar root', () => {
+		window.mediaManagerAdmin = {
+			preferences: { sidebar_width: 360 },
+		};
 		document.body.innerHTML =
 			'<div id="wpbody"><div id="wpbody-content"></div><div id="root" hidden><aside class="media-manager-sidebar"></aside></div></div>';
 		const root = document.getElementById( 'root' );
 		const teardown = mountMediaLibrarySidebar( { root } );
 
 		expect( root.hidden ).toBe( false );
+		expect( root.style.width ).toBe( '360px' );
+		expect(
+			root.classList.contains( 'media-manager-folder-root--mounted' )
+		).toBe( true );
 		expect(
 			document
 				.getElementById( 'wpbody' )
@@ -132,7 +147,12 @@ describe( 'media library adapters', () => {
 
 		teardown();
 		expect( root.hidden ).toBe( true );
+		expect( root.style.width ).toBe( '' );
+		expect(
+			root.classList.contains( 'media-manager-folder-root--mounted' )
+		).toBe( false );
 		expect( document.getElementById( 'media-manager-handler' ) ).toBeNull();
+		delete window.mediaManagerAdmin;
 	} );
 } );
 
