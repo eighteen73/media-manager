@@ -345,35 +345,43 @@ export default function FolderSidebar({
 				/>
 			</div>
 
-			<FolderDialog
-				isOpen={!!dialog}
-				title={dialog?.title || ''}
-				submitLabel={dialog?.submitLabel || __('Save', 'media-manager')}
-				initialName={dialog?.initialName || ''}
-				initialParent={dialog?.initialParent || 0}
-				initialAccessMode={dialog?.initialAccessMode || 'unrestricted'}
-				initialAllowedRoles={dialog?.initialAllowedRoles || []}
-				initialAllowedUsernames={dialog?.initialAllowedUsernames || []}
-				initialIsPrivate={!!dialog?.initialIsPrivate}
-				lockStructure={!!dialog?.lockStructure}
-				folders={fullTree}
-				excludeId={dialog?.id || 0}
-				onClose={() => setDialog(null)}
-				onSubmit={async (payload) => {
-					if (dialog?.type === 'create') {
-						await createFolder(payload);
-						return;
+			{dialog && (
+				<FolderDialog
+					key={`${dialog.type}-${dialog.id ?? 'new'}`}
+					title={dialog.title || ''}
+					submitLabel={
+						dialog.submitLabel || __('Save', 'media-manager')
 					}
-					if (dialog?.type === 'rename') {
-						await updateFolder(dialog.id, payload);
-						// Defer refresh so a media refresh failure cannot keep the modal open.
-						// A short delay lets attachment meta/URL filters settle after the move.
-						window.setTimeout(() => {
-							refreshCollections();
-						}, 150);
+					initialName={dialog.initialName || ''}
+					initialParent={dialog.initialParent || 0}
+					initialAccessMode={
+						dialog.initialAccessMode || 'unrestricted'
 					}
-				}}
-			/>
+					initialAllowedRoles={dialog.initialAllowedRoles || []}
+					initialAllowedUsernames={
+						dialog.initialAllowedUsernames || []
+					}
+					initialIsPrivate={!!dialog.initialIsPrivate}
+					lockStructure={!!dialog.lockStructure}
+					folders={fullTree}
+					excludeId={dialog.id || 0}
+					onClose={() => setDialog(null)}
+					onSubmit={async (payload) => {
+						if (dialog.type === 'create') {
+							await createFolder(payload);
+							return;
+						}
+						if (dialog.type === 'rename') {
+							await updateFolder(dialog.id, payload);
+							// Defer refresh so a media refresh failure cannot keep the modal open.
+							// A short delay lets attachment meta/URL filters settle after the move.
+							window.setTimeout(() => {
+								refreshCollections();
+							}, 150);
+						}
+					}}
+				/>
+			)}
 		</aside>
 	);
 }

@@ -2,7 +2,7 @@
  * Folder CRUD dialog (Name, Parent, Restrict Access, Private).
  */
 
-import { useState, useEffect, createPortal, useMemo } from '@wordpress/element';
+import { useState, createPortal, useMemo } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 
 /**
@@ -52,11 +52,13 @@ function getBoot() {
 /**
  * Create/rename folder dialog.
  *
+ * Mount only while open and remount (via key) when the target folder changes
+ * so draft state is seeded from initial* props without syncing in an effect.
+ *
  * @param {Object}   props Props.
- * @return {JSX.Element|null} Dialog.
+ * @return {JSX.Element} Dialog.
  */
 export default function FolderDialog({
-	isOpen,
 	title,
 	submitLabel,
 	initialName = '',
@@ -74,39 +76,16 @@ export default function FolderDialog({
 	const boot = useMemo(() => getBoot(), []);
 	const [name, setName] = useState(initialName);
 	const [parent, setParent] = useState(initialParent);
-	const [accessMode, setAccessMode] = useState(initialAccessMode);
-	const [allowedRoles, setAllowedRoles] = useState(initialAllowedRoles);
+	const [accessMode, setAccessMode] = useState(
+		initialAccessMode || 'unrestricted'
+	);
+	const [allowedRoles, setAllowedRoles] = useState(initialAllowedRoles || []);
 	const [allowedUsernames, setAllowedUsernames] = useState(
 		(initialAllowedUsernames || []).join('\n')
 	);
-	const [isPrivate, setIsPrivate] = useState(initialIsPrivate);
+	const [isPrivate, setIsPrivate] = useState(!!initialIsPrivate);
 	const [isBusy, setIsBusy] = useState(false);
 	const [submitError, setSubmitError] = useState('');
-
-	useEffect(() => {
-		if (isOpen) {
-			setName(initialName);
-			setParent(initialParent);
-			setAccessMode(initialAccessMode || 'unrestricted');
-			setAllowedRoles(initialAllowedRoles || []);
-			setAllowedUsernames((initialAllowedUsernames || []).join('\n'));
-			setIsPrivate(!!initialIsPrivate);
-			setIsBusy(false);
-			setSubmitError('');
-		}
-	}, [
-		isOpen,
-		initialName,
-		initialParent,
-		initialAccessMode,
-		initialAllowedRoles,
-		initialAllowedUsernames,
-		initialIsPrivate,
-	]);
-
-	if (!isOpen) {
-		return null;
-	}
 
 	const options = flattenOptions(folders, 0, excludeId);
 	const parentOption = options.find(
