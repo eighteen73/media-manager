@@ -16,6 +16,7 @@ import { __ } from '@wordpress/i18n';
  * @param {Function} props.onDownload   Download handler.
  * @param {Function} props.onDelete     Delete handler.
  * @param {boolean}  props.hasSelection Whether a folder is selected.
+ * @param {boolean}  props.canDownload  Whether the selected folder has media to download.
  * @param {boolean}  props.canDelete    Whether delete is allowed for selection.
  * @return {JSX.Element} Toolbar.
  */
@@ -28,6 +29,7 @@ export default function FolderToolbar({
 	onDownload,
 	onDelete,
 	hasSelection,
+	canDownload = true,
 	canDelete = true,
 }) {
 	const actionsClass = hasSelection ? '' : ' is-disabled';
@@ -61,16 +63,6 @@ export default function FolderToolbar({
 							aria-label={__('Edit folder', 'media-manager')}
 						/>
 					)}
-					{capabilities.view && (
-						<button
-							type="button"
-							className={`media-manager-download-folder${actionsClass}`}
-							onClick={onDownload}
-							disabled={!hasSelection}
-							title={__('Download folder', 'media-manager')}
-							aria-label={__('Download folder', 'media-manager')}
-						/>
-					)}
 					{capabilities.delete && (
 						<button
 							type="button"
@@ -79,6 +71,15 @@ export default function FolderToolbar({
 							disabled={!hasSelection || !canDelete}
 							title={__('Delete folder', 'media-manager')}
 							aria-label={__('Delete folder', 'media-manager')}
+						/>
+					)}
+					{capabilities.view && canDownload && (
+						<button
+							type="button"
+							className="media-manager-download-folder"
+							onClick={onDownload}
+							title={__('Download folder', 'media-manager')}
+							aria-label={__('Download folder', 'media-manager')}
 						/>
 					)}
 				</div>

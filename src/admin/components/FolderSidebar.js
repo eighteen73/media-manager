@@ -274,7 +274,11 @@ export default function FolderSidebar({
 					});
 				}}
 				onDownload={async () => {
-					if (!selectedFolder || selectedFolder < 1) {
+					if (
+						!selectedFolder ||
+						selectedFolder < 1 ||
+						!(selectedFolderNode?.count > 0)
+					) {
 						return;
 					}
 					await downloadFolder(selectedFolder);
@@ -294,6 +298,7 @@ export default function FolderSidebar({
 					}
 				}}
 				hasSelection={selectedFolder > 0}
+				canDownload={(selectedFolderNode?.count || 0) > 0}
 				canDelete={!folderMutationLocked}
 			/>
 
