@@ -8,6 +8,7 @@
 namespace Eighteen73\MediaManager;
 
 use Eighteen73\MediaManager\Admin\Assets;
+use Eighteen73\MediaManager\Admin\AttachmentEdit;
 use Eighteen73\MediaManager\Admin\MediaLibrary;
 use Eighteen73\MediaManager\Admin\NetworkSettings;
 use Eighteen73\MediaManager\Admin\Settings;
@@ -54,6 +55,7 @@ class Plugin {
 		( new UrlFilters() )->register();
 		( new Assets() )->register();
 		( new MediaLibrary() )->register();
+		( new AttachmentEdit() )->register();
 		( new Settings() )->register();
 
 		if ( is_multisite() ) {

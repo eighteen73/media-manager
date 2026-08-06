@@ -191,19 +191,25 @@ const actions = {
 			dispatch.setError(null);
 			try {
 				const response = await api.fetchFolders(true);
-				if (token === select.getRequestToken()) {
-					dispatch.setTree(
-						response.folders || [],
-						response.summary || null
-					);
+				if (token !== select.getRequestToken()) {
+					return;
 				}
+				dispatch.setTree(
+					response.folders || [],
+					response.summary || null
+				);
 			} catch (error) {
+				if (token !== select.getRequestToken()) {
+					return;
+				}
 				dispatch.setError(
 					error?.message ||
 						__('Unable to load folders.', 'media-manager')
 				);
 			} finally {
-				dispatch.setLoading(false);
+				if (token === select.getRequestToken()) {
+					dispatch.setLoading(false);
+				}
 			}
 		};
 	},
