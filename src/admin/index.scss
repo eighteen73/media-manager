@@ -20,9 +20,19 @@ body.media-manager-folders-active.upload-php
 	min-width: 0;
 }
 
-/* Let the sidebar participate in #wpbody flex like Rudrastyh's #smlf-sidebar. */
-.media-manager-folder-root--mounted {
-	display: contents;
+#media-manager-folder-root.media-manager-folder-root--mounted {
+	box-sizing: border-box;
+	position: sticky;
+	top: 32px;
+	margin: 10px 16px 0 2px;
+	height: calc(100vh - 72px);
+	overflow-x: hidden;
+	overflow-y: auto;
+	flex: 0 0 auto;
+	width: 300px;
+	min-width: 250px;
+	max-width: 500px;
+	color: var(--wp-admin-theme-color);
 }
 
 #media-manager-handler {
@@ -54,16 +64,11 @@ body.media-manager-folders-active.upload-php
 
 .media-manager-sidebar {
 	box-sizing: border-box;
-	position: sticky;
-	top: 32px;
-	margin: 10px 16px 0 2px;
-	height: calc(100vh - 72px);
-	overflow-x: hidden;
-	overflow-y: auto;
-	flex: 0 0 auto;
-	width: 300px;
-	min-width: 250px;
-	max-width: 500px;
+	width: 100%;
+	height: 100%;
+	min-width: 0;
+	max-width: none;
+	margin: 0;
 	color: #1d2327;
 }
 
@@ -319,7 +324,7 @@ body.media-manager-folders-active.upload-php
 
 .media-manager-folder-nav.is-current::before {
 	content: "\f18f";
-	color: #2271b1;
+	color: var(--wp-admin-theme-color);
 }
 
 // System roots + generated post folders share the post icon (not folder).
@@ -675,13 +680,15 @@ $mm-modal-sidebar-width: 280px;
 		display: none;
 	}
 
-	.media-manager-sidebar {
+	#media-manager-folder-root.media-manager-folder-root--mounted {
 		position: static;
 		height: auto;
 		max-height: none;
 		width: 100% !important;
+		min-width: 0;
 		max-width: none;
 		margin: 0 0 12px;
+		overflow: visible;
 	}
 }
 
