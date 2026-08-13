@@ -15,6 +15,13 @@ defined( 'ABSPATH' ) || exit;
 class AccessPolicy {
 
 	/**
+	 * Effective ACL resolver.
+	 *
+	 * @var EffectiveAcl|null
+	 */
+	private $acl = null;
+
+	/**
 	 * Whether the user can view folders.
 	 *
 	 * @param int $user_id Optional user ID. Defaults to current user.
@@ -55,6 +62,16 @@ class AccessPolicy {
 	}
 
 	/**
+	 * Whether the user can manage private folders.
+	 *
+	 * @param int $user_id Optional user ID. Defaults to current user.
+	 * @return bool
+	 */
+	public function can_manage_private_folders( int $user_id = 0 ): bool {
+		return $this->user_can( Capabilities::PRIVATE, $user_id );
+	}
+
+	/**
 	 * Whether the user can manage settings.
 	 *
 	 * @param int $user_id Optional user ID. Defaults to current user.
@@ -62,6 +79,51 @@ class AccessPolicy {
 	 */
 	public function can_manage_settings( int $user_id = 0 ): bool {
 		return $this->user_can( Capabilities::SETTINGS, $user_id );
+	}
+
+	/**
+	 * Whether the user can use shared network media.
+	 *
+	 * @param int $user_id Optional user ID. Defaults to current user.
+	 * @return bool
+	 */
+	public function can_use_shared_media( int $user_id = 0 ): bool {
+		return $this->user_can( Capabilities::SHARED, $user_id );
+	}
+
+	/**
+	 * Whether the user can access a specific folder.
+	 *
+	 * @param int $folder_id Folder ID.
+	 * @param int $user_id   Optional user ID.
+	 * @return bool
+	 */
+	public function can_access_folder( int $folder_id, int $user_id = 0 ): bool {
+		return $this->acl()->can_access_folder( $folder_id, $user_id );
+	}
+
+	/**
+	 * Whether the user can view an attachment under folder ACL rules.
+	 *
+	 * @param int $attachment_id Attachment ID.
+	 * @param int $user_id       Optional user ID.
+	 * @return bool
+	 */
+	public function can_view_attachment( int $attachment_id, int $user_id = 0 ): bool {
+		return $this->acl()->can_view_attachment( $attachment_id, $user_id );
+	}
+
+	/**
+	 * Lazy EffectiveAcl to avoid circular construction.
+	 *
+	 * @return EffectiveAcl
+	 */
+	private function acl(): EffectiveAcl {
+		if ( null === $this->acl ) {
+			$this->acl = new EffectiveAcl( null, null, $this );
+		}
+
+		return $this->acl;
 	}
 
 	/**

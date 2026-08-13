@@ -84,20 +84,20 @@
         },
         {
             "name": "doctrine/instantiator",
-            "version": "2.2.x-dev",
+            "version": "2.0.x-dev",
             "source": {
                 "type": "git",
                 "url": "https://github.com/doctrine/instantiator.git",
-                "reference": "c795a176780bcada3d008d07eef0c2b1b298665c"
+                "reference": "7be2ebd072deac210cb57eb2776aac19f4d5d1ad"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/doctrine/instantiator/zipball/c795a176780bcada3d008d07eef0c2b1b298665c",
-                "reference": "c795a176780bcada3d008d07eef0c2b1b298665c",
+                "url": "https://api.github.com/repos/doctrine/instantiator/zipball/7be2ebd072deac210cb57eb2776aac19f4d5d1ad",
+                "reference": "7be2ebd072deac210cb57eb2776aac19f4d5d1ad",
                 "shasum": ""
             },
             "require": {
-                "php": "^8.4"
+                "php": "^8.1"
             },
             "require-dev": {
                 "doctrine/coding-standard": "^14",
@@ -111,7 +111,7 @@
             "type": "library",
             "autoload": {
                 "psr-4": {
-                    "Doctrine\\Instantiator\\": "src/"
+                    "Doctrine\\Instantiator\\": "src/Doctrine/Instantiator/"
                 }
             },
             "notification-url": "https://packagist.org/downloads/",
@@ -133,7 +133,7 @@
             ],
             "support": {
                 "issues": "https://github.com/doctrine/instantiator/issues",
-                "source": "https://github.com/doctrine/instantiator/tree/2.2.x"
+                "source": "https://github.com/doctrine/instantiator/tree/2.0.x"
             },
             "funding": [
                 {
@@ -149,7 +149,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-03-20T19:06:08+00:00"
+            "time": "2026-01-04T22:42:35+00:00"
         },
         {
             "name": "eighteen73/wordpress-coding-standards",
@@ -1146,12 +1146,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/sebastianbergmann/phpunit.git",
-                "reference": "b760399172d31f71075305db16181569588f20f8"
+                "reference": "6d4bde7abc4020d95e9d0c95b0e3e5fd22c61e59"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/b760399172d31f71075305db16181569588f20f8",
-                "reference": "b760399172d31f71075305db16181569588f20f8",
+                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/6d4bde7abc4020d95e9d0c95b0e3e5fd22c61e59",
+                "reference": "6d4bde7abc4020d95e9d0c95b0e3e5fd22c61e59",
                 "shasum": ""
             },
             "require": {
@@ -1233,7 +1233,7 @@
                     "type": "other"
                 }
             ],
-            "time": "2026-07-24T06:34:38+00:00"
+            "time": "2026-08-04T03:06:56+00:00"
         },
         {
             "name": "sebastian/cli-parser",
@@ -2253,12 +2253,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/PHPCSStandards/PHP_CodeSniffer.git",
-                "reference": "20d0f55e6bbaca7dba506f9fb200644e8f3aebb0"
+                "reference": "b5ce04f12210b2fcb91fbcb9780d8fb0ffd07bea"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/PHPCSStandards/PHP_CodeSniffer/zipball/20d0f55e6bbaca7dba506f9fb200644e8f3aebb0",
-                "reference": "20d0f55e6bbaca7dba506f9fb200644e8f3aebb0",
+                "url": "https://api.github.com/repos/PHPCSStandards/PHP_CodeSniffer/zipball/b5ce04f12210b2fcb91fbcb9780d8fb0ffd07bea",
+                "reference": "b5ce04f12210b2fcb91fbcb9780d8fb0ffd07bea",
                 "shasum": ""
             },
             "require": {
@@ -2324,7 +2324,7 @@
                     "type": "thanks_dev"
                 }
             ],
-            "time": "2026-07-26T20:55:06+00:00"
+            "time": "2026-08-01T18:58:12+00:00"
         },
         {
             "name": "theseer/tokenizer",
@@ -2515,5 +2515,5 @@
         "php": ">=7.4"
     },
     "platform-dev": {},
-    "plugin-api-version": "2.6.0"
+    "plugin-api-version": "2.9.0"
 }
