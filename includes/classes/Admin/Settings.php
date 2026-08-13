@@ -1,20 +1,18 @@
 <?php
 /**
- * Media Manager settings page.
+ * Media Manager settings (Settings → Media).
  *
  * @package Eighteen73\MediaManager
  */
 
 namespace Eighteen73\MediaManager\Admin;
 
-use Eighteen73\MediaManager\Folders\FolderRepository;
-use Eighteen73\MediaManager\Permissions\AccessPolicy;
-use Eighteen73\MediaManager\Permissions\Capabilities;
+use Eighteen73\MediaManager\PrivateMedia\StorageConfig;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Settings > Media Manager.
+ * Settings registered on the core Media settings page.
  */
 class Settings {
 
@@ -26,46 +24,32 @@ class Settings {
 	public const OPTION = 'media_manager_settings';
 
 	/**
-	 * Access policy.
-	 *
-	 * @var AccessPolicy
-	 */
-	private AccessPolicy $access;
-
-	/**
-	 * Folder repository.
-	 *
-	 * @var FolderRepository
-	 */
-	private FolderRepository $repository;
-
-	/**
-	 * Constructor.
-	 *
-	 * @param AccessPolicy|null     $access     Optional access policy.
-	 * @param FolderRepository|null $repository Optional repository.
-	 */
-	public function __construct( ?AccessPolicy $access = null, ?FolderRepository $repository = null ) {
-		$this->access     = $access ?? new AccessPolicy();
-		$this->repository = $repository ?? new FolderRepository();
-	}
-
-	/**
 	 * Register hooks.
 	 *
 	 * @return void
 	 */
 	public function register(): void {
-		add_action( 'admin_menu', [ $this, 'register_menu' ] );
 		add_action( 'admin_init', [ $this, 'register_settings' ] );
 	}
 
 	/**
-	 * Default settings.
+	 * Default stored settings.
 	 *
 	 * @return array<string, mixed>
 	 */
 	public static function defaults(): array {
+		return [
+			'private_storage_path'    => '',
+			'generated_media_folders' => [],
+		];
+	}
+
+	/**
+	 * Default folder UI behaviour (not stored; overridable via filter).
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function folder_ui_defaults(): array {
 		return [
 			'show_count'         => true,
 			'show_search'        => true,
@@ -87,32 +71,61 @@ class Settings {
 			$stored = [];
 		}
 
-		return array_merge( self::defaults(), $stored );
+		$merged = array_merge( self::defaults(), $stored );
+
+		return array_intersect_key( $merged, self::defaults() );
 	}
 
 	/**
-	 * Register the settings submenu.
+	 * Folder UI behaviour that is no longer exposed in settings.
 	 *
-	 * @return void
+	 * @return array{
+	 *     show_count: bool,
+	 *     show_search: bool,
+	 *     show_list_view: bool,
+	 *     show_modal_sidebar: bool,
+	 *     default_folder: int
+	 * }
 	 */
-	public function register_menu(): void {
-		add_options_page(
-			__( 'Media Manager', 'media-manager' ),
-			__( 'Media Manager', 'media-manager' ),
-			Capabilities::SETTINGS,
-			'media-manager',
-			[ $this, 'render_page' ]
-		);
+	public static function get_folder_ui(): array {
+		$defaults = self::folder_ui_defaults();
+
+		/**
+		 * Filter folder UI behaviour that is no longer exposed in settings.
+		 *
+		 * @param array $ui {
+		 *     @type bool $show_count         Show item counts in the folder tree.
+		 *     @type bool $show_search        Show folder search.
+		 *     @type bool $show_list_view     Show folder filter in list view.
+		 *     @type bool $show_modal_sidebar Show folders in the media modal.
+		 *     @type int  $default_folder     Term ID, or 0 for All Media.
+		 * }
+		 */
+		$ui = apply_filters( 'media_manager_folder_ui', $defaults );
+
+		if ( ! is_array( $ui ) ) {
+			$ui = [];
+		}
+
+		$ui = array_merge( $defaults, $ui );
+
+		return [
+			'show_count'         => ! empty( $ui['show_count'] ),
+			'show_search'        => ! empty( $ui['show_search'] ),
+			'show_list_view'     => ! empty( $ui['show_list_view'] ),
+			'show_modal_sidebar' => ! empty( $ui['show_modal_sidebar'] ),
+			'default_folder'     => absint( $ui['default_folder'] ?? 0 ),
+		];
 	}
 
 	/**
-	 * Register Settings API fields.
+	 * Register Settings API fields on Settings → Media.
 	 *
 	 * @return void
 	 */
 	public function register_settings(): void {
 		register_setting(
-			'media_manager_settings_group',
+			'media',
 			self::OPTION,
 			[
 				'type'              => 'object',
@@ -123,41 +136,37 @@ class Settings {
 		);
 
 		add_settings_section(
-			'media_manager_general',
-			__( 'Public folders', 'media-manager' ),
+			'media_manager_private',
+			__( 'Private storage', 'media-manager' ),
 			static function (): void {
-				echo '<p>' . esc_html__( 'Configure how public media folders appear in the Media Library and media modal.', 'media-manager' ) . '</p>';
+				echo '<p>' . esc_html__( 'Private folders store files outside the public web root. Leave blank to use the site default private directory, or set an absolute writable path outside ABSPATH and uploads.', 'media-manager' ) . '</p>';
 			},
-			'media-manager'
+			'media'
 		);
 
-		$fields = [
-			'show_count'         => __( 'Show item counts in the folder tree', 'media-manager' ),
-			'show_search'        => __( 'Show folder search', 'media-manager' ),
-			'show_list_view'     => __( 'Show folder filter in list view', 'media-manager' ),
-			'show_modal_sidebar' => __( 'Show folders in the media modal', 'media-manager' ),
-		];
+		add_settings_field(
+			'media_manager_private_storage_path',
+			__( 'Private storage path', 'media-manager' ),
+			[ $this, 'render_private_storage_field' ],
+			'media',
+			'media_manager_private'
+		);
 
-		foreach ( $fields as $key => $label ) {
-			add_settings_field(
-				$key,
-				$label,
-				[ $this, 'render_checkbox_field' ],
-				'media-manager',
-				'media_manager_general',
-				[
-					'key'   => $key,
-					'label' => $label,
-				]
-			);
-		}
+		add_settings_section(
+			'media_manager_generated',
+			__( 'Generated media folders', 'media-manager' ),
+			static function (): void {
+				echo '<p>' . esc_html__( 'Generate a media library folder per post type and automatically uploaded files there.', 'media-manager' ) . '</p>';
+			},
+			'media'
+		);
 
 		add_settings_field(
-			'default_folder',
-			__( 'Default folder selection', 'media-manager' ),
-			[ $this, 'render_default_folder_field' ],
-			'media-manager',
-			'media_manager_general'
+			'media_manager_generated_media_folders',
+			__( 'Enable for post types', 'media-manager' ),
+			[ $this, 'render_generated_media_folders_field' ],
+			'media',
+			'media_manager_generated'
 		);
 	}
 
@@ -168,95 +177,91 @@ class Settings {
 	 * @return array<string, mixed>
 	 */
 	public function sanitize( $input ): array {
-		$defaults = self::defaults();
-		$input    = is_array( $input ) ? $input : [];
-		$output   = $defaults;
+		$input  = is_array( $input ) ? $input : [];
+		$output = self::defaults();
 
-		foreach ( [ 'show_count', 'show_search', 'show_list_view', 'show_modal_sidebar' ] as $key ) {
-			$output[ $key ] = ! empty( $input[ $key ] );
-		}
+		$path                           = isset( $input['private_storage_path'] ) ? trim( (string) $input['private_storage_path'] ) : '';
+		$path                           = str_replace( "\0", '', $path );
+		$output['private_storage_path'] = untrailingslashit( $path );
 
-		$default_folder = isset( $input['default_folder'] ) ? absint( $input['default_folder'] ) : 0;
-
-		if ( $default_folder > 0 ) {
-			$folder = $this->repository->find( $default_folder );
-			if ( is_wp_error( $folder ) ) {
-				$default_folder = 0;
+		$enabled_types = [];
+		$raw_types     = isset( $input['generated_media_folders'] ) && is_array( $input['generated_media_folders'] )
+			? $input['generated_media_folders']
+			: [];
+		$service       = new \Eighteen73\MediaManager\ContentFolders\ContentFolderService();
+		$eligible      = $service->eligible_post_types();
+		foreach ( array_keys( $eligible ) as $post_type ) {
+			if ( ! empty( $raw_types[ $post_type ] ) ) {
+				$enabled_types[ $post_type ] = true;
+				$service->ensure_system_root( $post_type );
 			}
 		}
+		$output['generated_media_folders'] = $enabled_types;
 
-		$output['default_folder'] = $default_folder;
+		// Keep private delivery rewrites current whenever settings are saved.
+		( new \Eighteen73\MediaManager\PrivateMedia\Delivery() )->add_rewrite_rules();
+		flush_rewrite_rules( false );
 
 		return $output;
 	}
 
 	/**
-	 * Render a checkbox field.
+	 * Render private storage path + health.
 	 *
-	 * @param array $args Field args.
 	 * @return void
 	 */
-	public function render_checkbox_field( array $args ): void {
-		$settings = self::get_settings();
-		$key      = $args['key'];
-		$checked  = ! empty( $settings[ $key ] );
+	public function render_private_storage_field(): void {
+		$settings     = self::get_settings();
+		$path         = (string) $settings['private_storage_path'];
+		$default_path = StorageConfig::default_path();
+		$health       = ( new StorageConfig() )->health();
 
 		printf(
-			'<label><input type="checkbox" name="%1$s[%2$s]" value="1" %3$s /> %4$s</label>',
+			'<input type="text" class="large-text code" name="%1$s[private_storage_path]" value="%2$s" placeholder="%3$s" />',
 			esc_attr( self::OPTION ),
-			esc_attr( $key ),
-			checked( $checked, true, false ),
-			esc_html( $args['label'] )
+			esc_attr( $path ),
+			esc_attr( $default_path )
+		);
+
+		echo '<p class="description">' . esc_html__( 'Leave blank to use the site default:', 'media-manager' ) . ' <code>' . esc_html( $default_path ) . '</code></p>';
+
+		$class = ! empty( $health['ok'] ) ? 'notice notice-success inline' : 'notice notice-warning inline';
+		printf(
+			'<div class="%1$s"><p>%2$s</p></div>',
+			esc_attr( $class ),
+			esc_html( $health['message'] )
 		);
 	}
 
 	/**
-	 * Render the default folder select.
+	 * Render generated media folder post type checkboxes.
 	 *
 	 * @return void
 	 */
-	public function render_default_folder_field(): void {
+	public function render_generated_media_folders_field(): void {
 		$settings = self::get_settings();
-		$selected = (int) $settings['default_folder'];
-		$folders  = $this->repository->all();
+		$map      = isset( $settings['generated_media_folders'] ) && is_array( $settings['generated_media_folders'] )
+			? $settings['generated_media_folders']
+			: [];
+		$service  = new \Eighteen73\MediaManager\ContentFolders\ContentFolderService();
+		$types    = $service->eligible_post_types();
 
-		printf( '<select name="%s[default_folder]">', esc_attr( self::OPTION ) );
-		printf(
-			'<option value="0"%s>%s</option>',
-			selected( $selected, 0, false ),
-			esc_html__( 'All Media', 'media-manager' )
-		);
+		if ( empty( $types ) ) {
+			echo '<p class="description">' . esc_html__( 'No eligible post types found.', 'media-manager' ) . '</p>';
+			return;
+		}
 
-		foreach ( $folders as $folder ) {
+		echo '<fieldset>';
+		foreach ( $types as $slug => $object ) {
+			$label = $object->labels->name ?? $slug;
 			printf(
-				'<option value="%1$d"%2$s>%3$s</option>',
-				(int) $folder->term_id,
-				selected( $selected, (int) $folder->term_id, false ),
-				esc_html( $folder->name )
+				'<label style="display:block;margin-bottom:4px;"><input type="checkbox" name="%1$s[generated_media_folders][%2$s]" value="1" %3$s /> %4$s</label>',
+				esc_attr( self::OPTION ),
+				esc_attr( $slug ),
+				checked( ! empty( $map[ $slug ] ), true, false ),
+				esc_html( $label )
 			);
 		}
-
-		echo '</select>';
-		echo '<p class="description">' . esc_html__( 'Used when a user has no previous folder preference.', 'media-manager' ) . '</p>';
-	}
-
-	/**
-	 * Render the settings page.
-	 *
-	 * @return void
-	 */
-	public function render_page(): void {
-		if ( ! $this->access->can_manage_settings() ) {
-			wp_die( esc_html__( 'Sorry, you are not allowed to manage Media Manager settings.', 'media-manager' ) );
-		}
-
-		echo '<div class="wrap">';
-		echo '<h1>' . esc_html__( 'Media Manager', 'media-manager' ) . '</h1>';
-		echo '<form action="options.php" method="post">';
-		settings_fields( 'media_manager_settings_group' );
-		do_settings_sections( 'media-manager' );
-		submit_button();
-		echo '</form>';
-		echo '</div>';
+		echo '</fieldset>';
 	}
 }

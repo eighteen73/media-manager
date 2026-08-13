@@ -21,7 +21,6 @@ export function observeMediaFrames({ onFrame }) {
 
 	wp.media.view.Modal = OriginalModal.extend({
 		open() {
-			const result = OriginalModal.prototype.open.apply(this, arguments);
 			if (active && this?.options?.controller) {
 				const frame = this.options.controller;
 				if (!observedFrames.has(frame)) {
@@ -29,7 +28,7 @@ export function observeMediaFrames({ onFrame }) {
 					onFrame(frame);
 				}
 			}
-			return result;
+			return OriginalModal.prototype.open.apply(this, arguments);
 		},
 	});
 
@@ -81,19 +80,52 @@ export function subscribeToSelection(frame, callback) {
 }
 
 /**
- * Inject a lightweight folder toolbar mount into an attachment browser.
+ * Inject a full-height folder sidebar mount into an attachment browser.
  *
  * @param {Object} frame Media frame.
  * @return {HTMLElement|null} Mount element.
  */
-export function ensureModalFolderMount(frame) {
+/**
+ * Inject a full-height folder sidebar mount into an attachment browser.
+ *
+ * @param {Object}      frame       Media frame.
+ * @param {Object|null} browserView Optional AttachmentsBrowser from content:create.
+ * @return {HTMLElement|null} Mount element.
+ */
+export function ensureModalFolderMount(frame, browserView = null) {
 	if (!frame?.$el) {
 		return null;
 	}
 
-	const browser = frame.$el.find('.attachments-browser').get(0);
+	const frameEl = frame.$el.get?.(0) || frame.$el[0] || null;
+	let browser = frame.$el.find('.attachments-browser').get(0);
+
+	// During content:create the browser view exists but is not in the frame DOM yet.
+	if (!browser && browserView) {
+		if (browserView.el?.classList?.contains('attachments-browser')) {
+			browser = browserView.el;
+		} else if (browserView.$el?.length) {
+			browser =
+				browserView.$el.filter('.attachments-browser').get(0) ||
+				browserView.$el.find('.attachments-browser').get(0) ||
+				null;
+		}
+	}
+
+	if (!browser) {
+		const view = frame.content?.get?.() || null;
+		if (view?.el?.classList?.contains('attachments-browser')) {
+			browser = view.el;
+		}
+	}
+
 	if (!browser) {
 		return null;
+	}
+
+	browser.classList.add('has-media-manager-folders');
+	if (frameEl) {
+		frameEl.classList.add('has-media-manager-folders');
 	}
 
 	let mount = browser.querySelector('.media-manager-modal-folders');

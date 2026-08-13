@@ -1,3 +1,5 @@
+/* global URL */
+
 /**
  * Media Manager REST API helpers.
  */
@@ -20,9 +22,22 @@ export async function fetchFolders(recursiveCounts = true) {
 }
 
 /**
+ * Fetch the network library folder tree (Shared media tab).
+ *
+ * @param {boolean} recursiveCounts Whether counts include descendants.
+ * @return {Promise<Object>} Tree response.
+ */
+export async function fetchSharedFolders(recursiveCounts = true) {
+	const query = recursiveCounts
+		? '?recursive_counts=true'
+		: '?recursive_counts=false';
+	return apiFetch({ path: `${ROOT}/shared-folders${query}` });
+}
+
+/**
  * Create a folder.
  *
- * @param {{ name: string, parent?: number }} data Folder data.
+ * @param {Object} data Folder data.
  * @return {Promise<Object>} Created folder.
  */
 export async function createFolder(data) {
@@ -32,6 +47,10 @@ export async function createFolder(data) {
 		data: {
 			name: data.name,
 			parent: data.parent || 0,
+			access_mode: data.access_mode || 'unrestricted',
+			allowed_roles: data.allowed_roles || [],
+			allowed_usernames: data.allowed_usernames || [],
+			is_private: !!data.is_private,
 		},
 	});
 }
@@ -39,8 +58,8 @@ export async function createFolder(data) {
 /**
  * Update a folder.
  *
- * @param {number}                           id   Folder ID.
- * @param {{ name: string, parent: number }} data Folder data.
+ * @param {number} id   Folder ID.
+ * @param {Object} data Folder data.
  * @return {Promise<Object>} Updated folder.
  */
 export async function updateFolder(id, data) {
@@ -50,6 +69,10 @@ export async function updateFolder(id, data) {
 		data: {
 			name: data.name,
 			parent: data.parent,
+			access_mode: data.access_mode,
+			allowed_roles: data.allowed_roles || [],
+			allowed_usernames: data.allowed_usernames || [],
+			is_private: !!data.is_private,
 		},
 	});
 }
@@ -68,20 +91,118 @@ export async function deleteFolder(id) {
 }
 
 /**
+ * Download a folder as a zip of full-size originals.
+ *
+ * @param {number} id Folder ID.
+ * @return {Promise<{ blob: Blob, filename: string }>} Zip blob and filename.
+ */
+export async function downloadFolder(id) {
+	let response;
+
+	try {
+		response = await apiFetch({
+			path: `${ROOT}/folders/${id}/download`,
+			method: 'GET',
+			parse: false,
+		});
+	} catch (error) {
+		throw await normalizeDownloadError(error);
+	}
+
+	if (!response?.ok) {
+		throw await normalizeDownloadError(response);
+	}
+
+	const disposition = response.headers.get('Content-Disposition') || '';
+	const match = disposition.match(/filename\*?=(?:UTF-8''|")?([^\";]+)"?/i);
+	const filename = match
+		? decodeURIComponent(match[1].replace(/["']/g, '').trim())
+		: `folder-${id}.zip`;
+
+	const blob = await response.blob();
+	return { blob, filename };
+}
+
+/**
+ * Convert apiFetch / Response failures into Error instances with messages.
+ *
+ * @param {unknown} error Thrown value or failed Response.
+ * @return {Promise<Error>} Normalized error.
+ */
+async function normalizeDownloadError(error) {
+	if (error instanceof Error && error.message) {
+		return error;
+	}
+
+	let message = '';
+	let status;
+
+	if (error && typeof error === 'object') {
+		if (typeof error.json === 'function') {
+			try {
+				const data = await error.json();
+				message = data?.message || data?.code || '';
+				status = data?.data?.status || error.status;
+			} catch (_err) {
+				status = error.status;
+			}
+		} else if (error.message) {
+			message = error.message;
+			status = error?.data?.status;
+		} else if (error.code) {
+			message = error.message || error.code;
+			status = error?.data?.status;
+		}
+	}
+
+	const normalized = new Error(message || 'Unable to download folder.');
+	normalized.code = 'media_manager_download_failed';
+	normalized.data = { status };
+	return normalized;
+}
+
+/**
+ * Trigger a browser file download from a blob.
+ *
+ * @param {Blob}   blob     File blob.
+ * @param {string} filename Download filename.
+ * @return {void}
+ */
+export function triggerBlobDownload(blob, filename) {
+	const url = URL.createObjectURL(blob);
+	const link = document.createElement('a');
+	link.href = url;
+	link.download = filename;
+	link.rel = 'noopener';
+	document.body.appendChild(link);
+	link.click();
+	link.remove();
+	window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/**
  * Assign attachments to a folder.
  *
- * @param {{ attachmentIds: number[], folderId: number, mode: 'add'|'move' }} data Assignment payload.
+ * @param {{ attachmentIds: number[], folderId?: number, folderIds?: number[], mode: 'add'|'move'|'set', confirm?: boolean }} data Assignment payload.
  * @return {Promise<Object>} Assignment response.
  */
 export async function assignAttachments(data) {
+	const payload = {
+		attachment_ids: data.attachmentIds,
+		mode: data.mode,
+		confirm: !!data.confirm,
+	};
+
+	if (data.mode === 'set') {
+		payload.folder_ids = Array.isArray(data.folderIds) ? data.folderIds : [];
+	} else {
+		payload.folder_id = data.folderId;
+	}
+
 	return apiFetch({
 		path: `${ROOT}/assignments`,
 		method: 'POST',
-		data: {
-			attachment_ids: data.attachmentIds,
-			folder_id: data.folderId,
-			mode: data.mode,
-		},
+		data: payload,
 	});
 }
 

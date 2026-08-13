@@ -9,7 +9,7 @@ module.exports = [
 		],
 	},
 	{
-		files: [ 'src/**/*.{js,jsx}' ],
+		files: ['src/**/*.{js,jsx}'],
 		languageOptions: {
 			ecmaVersion: 'latest',
 			sourceType: 'module',

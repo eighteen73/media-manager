@@ -3,7 +3,7 @@
 /* List View-style tree geometry: child chevron aligns under parent folder icon. */
 $mm-tree-chevron-left: 2px;
 $mm-tree-icon-left: 26px;
-$mm-tree-nest-step: $mm-tree-icon-left - $mm-tree-chevron-left; // 24px
+$mm-tree-nest-step: $mm-tree-icon-left - $mm-tree-chevron-left;
 $mm-tree-row-padding-left: 52px;
 
 body.media-manager-folders-active.upload-php #wpbody.media-manager-has-folders {
@@ -20,9 +20,19 @@ body.media-manager-folders-active.upload-php
 	min-width: 0;
 }
 
-/* Let the sidebar participate in #wpbody flex like Rudrastyh's #smlf-sidebar. */
-.media-manager-folder-root--mounted {
-	display: contents;
+#media-manager-folder-root.media-manager-folder-root--mounted {
+	box-sizing: border-box;
+	position: sticky;
+	top: 32px;
+	margin: 10px 16px 0 2px;
+	height: calc(100vh - 72px);
+	overflow-x: hidden;
+	overflow-y: auto;
+	flex: 0 0 auto;
+	width: 300px;
+	min-width: 250px;
+	max-width: 500px;
+	color: var(--wp-admin-theme-color);
 }
 
 #media-manager-handler {
@@ -48,35 +58,33 @@ body.media-manager-folders-active.upload-php
 }
 
 #media-manager-handler:hover::before {
-	background-color: #2271b1;
-	box-shadow: 1px 0 #2271b1;
+	background-color: var(--wp-admin-theme-color);
+	box-shadow: 1px 0 var(--wp-admin-theme-color);
 }
 
 .media-manager-sidebar {
 	box-sizing: border-box;
-	position: sticky;
-	top: 32px;
-	margin: 10px 16px 0 2px;
-	height: calc(100vh - 72px);
-	overflow-x: hidden;
-	overflow-y: auto;
-	flex: 0 0 auto;
-	width: 300px;
-	min-width: 250px;
-	max-width: 500px;
+	width: 100%;
+	height: 100%;
+	min-width: 0;
+	max-width: none;
+	margin: 0;
 	color: #1d2327;
 }
 
 .media-manager-sidebar.is-compact {
+	position: static;
+	top: auto;
 	width: 100%;
 	max-width: none;
 	min-width: 0;
-	max-height: 240px;
-	overflow: auto;
+	height: 100%;
+	max-height: none;
+	overflow: visible;
 	margin: 0;
-	padding: 8px 12px;
-	background: #f6f7f7;
-	border-right: 1px solid #dcdcde;
+	padding: 0;
+	background: transparent;
+	border-right: 0;
 }
 
 .media-manager-sidebar__header {
@@ -142,7 +150,7 @@ body.media-manager-folders-active.upload-php
 }
 
 .media-manager-folder-actions button::before {
-	color: #c3c4c7;
+	color: #a7aaad;
 	display: inline-block;
 	font: normal 20px/1 dashicons;
 	vertical-align: middle;
@@ -152,6 +160,10 @@ body.media-manager-folders-active.upload-php
 
 .media-manager-edit-folder::before {
 	content: "\f464";
+}
+
+.media-manager-download-folder::before {
+	content: "\f316";
 }
 
 .media-manager-delete-folder::before {
@@ -217,8 +229,8 @@ body.media-manager-folders-active.upload-php
 }
 
 .media-manager-search input.search:focus {
-	border-color: #2271b1;
-	box-shadow: 0 0 0 1px #2271b1;
+	border-color: var(--wp-admin-theme-color);
+	box-shadow: 0 0 0 1px var(--wp-admin-theme-color);
 	outline: 2px solid transparent;
 }
 
@@ -237,6 +249,12 @@ body.media-manager-folders-active.upload-php
 
 .media-manager-folders-toplevel li {
 	margin: 0;
+}
+
+.media-manager-folders-toplevel li.media-manager-folders-li--section-start {
+	margin-top: 10px;
+	padding-top: 10px;
+	border-top: 1px solid #dcdcde;
 }
 
 .media-manager-folder-nav {
@@ -260,6 +278,25 @@ body.media-manager-folders-active.upload-php
 	padding-right: 42px;
 }
 
+.media-manager-folder-nav__name {
+	display: inline;
+}
+
+.media-manager-folder-nav__badge {
+	display: inline-block;
+	margin-left: 4px;
+	width: 16px;
+	height: 16px;
+	font-size: 14px;
+	line-height: 32px;
+	vertical-align: top;
+	color: #646970;
+}
+
+.media-manager-folder-nav.is-current .media-manager-folder-nav__badge {
+	color: var(--wp-admin-theme-color);
+}
+
 .media-manager-folder-nav::before {
 	position: absolute;
 	left: 8px;
@@ -281,18 +318,24 @@ body.media-manager-folders-active.upload-php
 }
 
 .media-manager-folder-nav.is-current {
-	color: #2271b1;
-	background-color: #f0f6fc;
+	color: var(--wp-admin-theme-color);
+	background-color: rgb(from var(--wp-admin-theme-color) r g b / 0.1);
 }
 
 .media-manager-folder-nav.is-current::before {
 	content: "\f18f";
-	color: #2271b1;
+	color: var(--wp-admin-theme-color);
+}
+
+// System roots + generated post folders share the post icon (not folder).
+.media-manager-folder-nav--post::before,
+.media-manager-folder-nav--post.is-current::before {
+	content: "\f109";
 }
 
 .media-manager-folder-nav.is-drop-target,
 .media-manager-folder-nav.media-manager-folder-nav--drop {
-	outline: 1px dashed #2271b1;
+	outline: 1px dashed var(--wp-admin-theme-color);
 }
 
 .media-manager-attachment-dragging {
@@ -353,7 +396,7 @@ body.media-manager-folders-active.upload-php
 .media-manager-folder-nav--has-children.is-current
 	.media-manager-folder-nav__open-close
 	svg {
-	fill: #2271b1;
+	fill: var(--wp-admin-theme-color);
 }
 
 .media-manager-folder-nav__count {
@@ -377,7 +420,7 @@ body.media-manager-folders-active.upload-php
 
 .media-manager-folder-nav.is-current .media-manager-folder-nav__count {
 	border-color: #c3c4c7;
-	color: #2271b1;
+	color: var(--wp-admin-theme-color);
 }
 
 .media-manager-folders-ul--tree .media-manager-folder-nav {
@@ -417,12 +460,18 @@ body.media-manager-folders-active.upload-php
 	border-radius: 8px;
 	position: fixed;
 	background: #fff;
-	z-index: 100100;
+	/* Above core .media-modal (160000) so folder CRUD works inside wp.media. */
+	z-index: 170000;
 	left: 50%;
 	top: 50%;
 	transform: translate(-50%, -50%);
 	width: 50%;
 	max-width: 500px;
+}
+
+.wp-customizer .media-manager-modal {
+	/* Above .wp-customizer .media-modal (560000). */
+	z-index: 570000;
 }
 
 .media-manager-modal__topbar {
@@ -468,14 +517,18 @@ body.media-manager-folders-active.upload-php
 	padding: 0;
 }
 
-.media-manager-modal__body fieldset input,
-.media-manager-modal__body fieldset select {
+.media-manager-modal__body fieldset input[type="text"],
+.media-manager-modal__body fieldset input[type="search"],
+.media-manager-modal__body fieldset input.input-text,
+.media-manager-modal__body fieldset select,
+.media-manager-modal__body fieldset textarea {
 	width: 100%;
 	max-width: 100%;
 	margin: 5px 0 0;
 	padding: 12px;
 	font-size: 13px;
 	line-height: 16px;
+	box-sizing: border-box;
 }
 
 .media-manager-modal__bottombar {
@@ -484,20 +537,137 @@ body.media-manager-folders-active.upload-php
 	text-align: right;
 }
 
+.media-manager-checkbox {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	margin: 5px 0 0;
+	font-size: 13px;
+	font-weight: 400;
+	line-height: 1.4;
+	cursor: pointer;
+}
+
+.media-manager-checkbox input[type="checkbox"] {
+	flex: 0 0 auto;
+	width: 1rem;
+	height: 1rem;
+	margin: 0.15em 0 0;
+	padding: 0;
+	appearance: auto;
+	-webkit-appearance: checkbox;
+}
+
+.media-manager-role-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	max-height: 160px;
+	overflow: auto;
+	border: 1px solid #dcdcde;
+	padding: 10px 12px;
+	margin-top: 5px;
+	background: #fff;
+	box-sizing: border-box;
+}
+
+.media-manager-role-list .media-manager-checkbox {
+	margin: 0;
+}
+
 .media-manager-modal-backdrop {
 	position: fixed;
 	inset: 0;
 	min-height: 360px;
 	background: #000;
 	opacity: 0.5;
-	z-index: 100050;
+	/* Above core .media-modal-backdrop (159900), below .media-manager-modal. */
+	z-index: 169900;
 	border: 0;
 	padding: 0;
 	cursor: default;
 }
 
-.media-manager-modal-folders {
-	padding: 8px 12px 0;
+.wp-customizer .media-manager-modal-backdrop {
+	z-index: 569900;
+}
+
+/* Modal Media Library: full-height left folder column (Rudrastyh/FileBird-style). */
+$mm-modal-sidebar-width: 280px;
+
+.media-modal .media-manager-modal-folders,
+.media-frame .media-manager-modal-folders {
+	box-sizing: border-box;
+	position: absolute;
+	top: 0;
+	left: 0;
+	bottom: 0;
+	width: $mm-modal-sidebar-width;
+	padding: 8px 12px;
+	background: #f6f7f7;
+	border-right: 1px solid #dcdcde;
+	overflow: auto;
+	-webkit-overflow-scrolling: touch;
+	z-index: 75;
+}
+
+.media-modal .attachments-browser.has-media-manager-folders .media-toolbar,
+.media-modal .attachments-browser.has-media-manager-folders .uploader-inline,
+.media-modal
+	.attachments-browser.has-media-manager-folders.has-load-more
+	.attachments-wrapper,
+.media-modal
+	.attachments-browser.has-media-manager-folders:not(.has-load-more)
+	.attachments,
+.media-frame .attachments-browser.has-media-manager-folders .media-toolbar,
+.media-frame .attachments-browser.has-media-manager-folders .uploader-inline,
+.media-frame
+	.attachments-browser.has-media-manager-folders.has-load-more
+	.attachments-wrapper,
+.media-frame
+	.attachments-browser.has-media-manager-folders:not(.has-load-more)
+	.attachments,
+.media-modal .attachments-browser:has(> .media-manager-modal-folders) .media-toolbar,
+.media-modal .attachments-browser:has(> .media-manager-modal-folders) .uploader-inline,
+.media-modal
+	.attachments-browser:has(> .media-manager-modal-folders).has-load-more
+	.attachments-wrapper,
+.media-modal
+	.attachments-browser:has(> .media-manager-modal-folders):not(.has-load-more)
+	.attachments,
+.media-frame .attachments-browser:has(> .media-manager-modal-folders) .media-toolbar,
+.media-frame .attachments-browser:has(> .media-manager-modal-folders) .uploader-inline,
+.media-frame
+	.attachments-browser:has(> .media-manager-modal-folders).has-load-more
+	.attachments-wrapper,
+.media-frame
+	.attachments-browser:has(> .media-manager-modal-folders):not(.has-load-more)
+	.attachments {
+	left: $mm-modal-sidebar-width;
+}
+
+.media-modal .media-frame.has-media-manager-folders .media-frame-router,
+.media-frame.has-media-manager-folders .media-frame-router,
+.media-modal .media-frame:has(.media-manager-modal-folders) .media-frame-router,
+.media-frame:has(.media-manager-modal-folders) .media-frame-router {
+	left: $mm-modal-sidebar-width;
+}
+
+.media-modal .attachments-browser.media-manager-shared-browser .uploader-inline,
+.media-frame .attachments-browser.media-manager-shared-browser .uploader-inline {
+	display: none !important;
+}
+
+.media-modal .media-manager-modal-folders .media-manager-sidebar__header .wp-heading-inline,
+.media-frame .media-manager-modal-folders .media-manager-sidebar__header .wp-heading-inline {
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.media-modal .media-manager-modal-folders .media-manager-sidebar__toolbar,
+.media-frame .media-manager-modal-folders .media-manager-sidebar__toolbar {
+	height: 40px;
+	margin-bottom: 10px;
 }
 
 @media screen and (max-width: 782px) {
@@ -510,13 +680,15 @@ body.media-manager-folders-active.upload-php
 		display: none;
 	}
 
-	.media-manager-sidebar {
+	#media-manager-folder-root.media-manager-folder-root--mounted {
 		position: static;
 		height: auto;
 		max-height: none;
 		width: 100% !important;
+		min-width: 0;
 		max-width: none;
 		margin: 0 0 12px;
+		overflow: visible;
 	}
 }
 
@@ -545,4 +717,187 @@ body.media-manager-folders-active.upload-php
 #plupload-upload-ui .media-manager-upload-folder,
 .uploader-inline-content .media-manager-upload-folder {
 	margin-top: 16px;
+}
+
+/* Attachment details / edit screen folder checklist. */
+.attachment-details .media-manager-attachment-folders-root {
+	display: contents;
+}
+
+/* Modal: match core attachment .setting inputs (white box, border, radius, scroll). */
+.media-manager-attachment-folders--modal .media-manager-folder-checklist-wrap {
+	box-sizing: border-box;
+	float: right;
+	width: 65%;
+}
+
+.media-manager-attachment-folders--modal.setting .media-manager-folder-checklist {
+	background: #fff;
+	border: 1px solid #8c8f94;
+	border-radius: 4px;
+	box-sizing: border-box;
+	height: 10em;
+	min-height: 6em;
+	overflow: auto;
+	padding: 6px 8px;
+	resize: vertical;
+	width: 100%;
+}
+
+.media-manager-attachment-folders--modal .media-manager-attachment-folders__status,
+.media-manager-attachment-folders--modal .media-manager-attachment-folders__notice,
+.media-manager-attachment-folders--modal .media-manager-attachment-folders__error {
+	clear: none;
+	margin: 6px 0 0;
+}
+
+.media-manager-attachment-folders--modal .categorychecklist,
+.media-manager-attachment-folders--modal .checklist {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.media-manager-attachment-folders--modal .categorychecklist ul.children,
+.media-manager-attachment-folders--modal .checklist ul.children {
+	list-style: none;
+	margin-left: 14px;
+	padding: 0;
+}
+
+.media-manager-attachment-folders--modal .categorychecklist li,
+.media-manager-attachment-folders--modal .checklist li {
+	line-height: 1.5;
+	margin: 0;
+	padding: 2px 0;
+}
+
+/* Override .attachment-details .setting span { float; min-width: 30%; text-align: right }. */
+.media-manager-attachment-folders--modal .categorychecklist label,
+.media-manager-attachment-folders--modal .checklist label {
+	align-items: center;
+	box-sizing: border-box;
+	color: #1d2327;
+	display: flex;
+	float: none;
+	font-size: 13px;
+	font-style: normal;
+	font-weight: 400;
+	gap: 6px;
+	line-height: 1.4;
+	margin: 0;
+	min-height: 0;
+	padding: 0;
+	text-align: left;
+	width: 100%;
+}
+
+.media-manager-attachment-folders--modal .categorychecklist input[type="checkbox"],
+.media-manager-attachment-folders--modal .checklist input[type="checkbox"] {
+	float: none !important;
+	flex: 0 0 auto;
+	height: 1rem;
+	margin: 0 !important;
+	max-width: none;
+	padding: 0;
+	position: static;
+	width: 1rem;
+}
+
+.media-manager-attachment-folders--modal .categorychecklist span,
+.media-manager-attachment-folders--modal .checklist span,
+.media-manager-attachment-folders--modal .media-manager-folder-checklist__label {
+	color: inherit;
+	display: inline;
+	float: none !important;
+	font-size: inherit;
+	font-weight: 400;
+	line-height: inherit;
+	margin: 0 !important;
+	max-width: none;
+	min-height: 0 !important;
+	min-width: 0 !important;
+	overflow-wrap: normal;
+	padding: 0 !important;
+	text-align: left !important;
+	width: auto !important;
+}
+
+.media-manager-attachment-folders--modal .media-manager-folder-checklist__label {
+	flex: 1 1 auto;
+}
+
+/* Edit screen metabox: native category checklist (no create / no search). */
+#media-manager-folders-metabox .inside {
+	margin: 0;
+	padding: 0 12px 12px;
+}
+
+.media-manager-attachment-folders--metabox {
+	margin: 0;
+}
+
+/* Beat core `.categorydiv div.tabs-panel` (border + padding). */
+#media-manager-folders-metabox .categorydiv div.tabs-panel {
+	background: transparent;
+	border: none;
+	box-sizing: border-box;
+	max-height: 200px;
+	min-height: 42px;
+	overflow: auto;
+	padding: 0;
+}
+
+.media-manager-attachment-folders--metabox .categorychecklist {
+	list-style: none;
+	margin: 0;
+	padding: 8px 0;
+}
+
+.media-manager-attachment-folders--metabox .categorychecklist ul.children {
+	list-style: none;
+	margin-left: 14px;
+	padding: 0;
+}
+
+.media-manager-attachment-folders--metabox .categorychecklist li {
+	margin: 0;
+	padding: 2px 0;
+}
+
+.media-manager-attachment-folders--metabox .categorychecklist label {
+	align-items: center;
+	display: inline-flex;
+	gap: 6px;
+	line-height: 1.4;
+	margin: 0;
+	vertical-align: middle;
+}
+
+.media-manager-attachment-folders--metabox .categorychecklist input[type="checkbox"] {
+	flex: 0 0 auto;
+	margin: 0;
+}
+
+.media-manager-attachment-folders--metabox .media-manager-attachment-folders__status,
+.media-manager-attachment-folders--metabox .media-manager-attachment-folders__notice,
+.media-manager-attachment-folders--metabox .media-manager-attachment-folders__error {
+	margin: 8px 0 0;
+}
+
+.media-manager-folder-checklist__private {
+	color: #646970;
+	font-size: 12px;
+}
+
+.media-manager-attachment-folders__status,
+.media-manager-attachment-folders__notice.description {
+	clear: both;
+	margin: 6px 0 0;
+}
+
+.media-manager-attachment-folders__error {
+	clear: both;
+	color: #b32d2e;
+	margin: 6px 0 0;
 }

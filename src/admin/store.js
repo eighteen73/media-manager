@@ -60,22 +60,41 @@ export function filterTree(nodes, query) {
 }
 
 /**
- * Sort a folder tree by name or count without destroying hierarchy.
+ * Sort a folder tree by name (A–Z / Z–A) or count without destroying hierarchy.
+ * Top-level system roots stay first (then user folders); each group uses the active sort.
  *
  * @param {Array}  nodes Folder nodes.
  * @param {string} sort  Sort key.
+ * @param {number} depth Nesting depth (0 = top level).
  * @return {Array} Sorted nodes.
  */
-export function sortTree(nodes, sort) {
+export function sortTree(nodes, sort, depth = 0) {
 	const list = (nodes || []).map((node) => ({
 		...node,
-		children: sortTree(node.children || [], sort),
+		children: sortTree(node.children || [], sort, depth + 1),
 	}));
 
-	if (sort === 'count') {
-		list.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-	} else if (sort === 'a-z') {
-		list.sort((a, b) => a.name.localeCompare(b.name));
+	const compare = (a, b) => {
+		if (sort === 'count') {
+			return b.count - a.count || a.name.localeCompare(b.name) || a.id - b.id;
+		}
+		if (sort === 'z-a') {
+			return b.name.localeCompare(a.name) || a.id - b.id;
+		}
+		if (sort === 'a-z' || sort === '') {
+			return a.name.localeCompare(b.name) || a.id - b.id;
+		}
+		return 0;
+	};
+
+	if (depth === 0) {
+		const system = list.filter((node) => node.is_system_root).sort(compare);
+		const user = list.filter((node) => !node.is_system_root).sort(compare);
+		return [...system, ...user];
+	}
+
+	if (sort === 'count' || sort === 'a-z' || sort === 'z-a') {
+		list.sort(compare);
 	}
 
 	return list;
@@ -172,19 +191,25 @@ const actions = {
 			dispatch.setError(null);
 			try {
 				const response = await api.fetchFolders(true);
-				if (token === select.getRequestToken()) {
-					dispatch.setTree(
-						response.folders || [],
-						response.summary || null
-					);
+				if (token !== select.getRequestToken()) {
+					return;
 				}
+				dispatch.setTree(
+					response.folders || [],
+					response.summary || null
+				);
 			} catch (error) {
+				if (token !== select.getRequestToken()) {
+					return;
+				}
 				dispatch.setError(
 					error?.message ||
 						__('Unable to load folders.', 'media-manager')
 				);
 			} finally {
-				dispatch.setLoading(false);
+				if (token === select.getRequestToken()) {
+					dispatch.setLoading(false);
+				}
 			}
 		};
 	},
@@ -201,12 +226,16 @@ const actions = {
 			}
 		};
 	},
-	createFolder(name, parent = 0) {
+	createFolder(payload, parent = 0) {
 		return async ({ dispatch }) => {
+			const data =
+				typeof payload === 'string'
+					? { name: payload, parent }
+					: { parent: 0, ...payload };
 			dispatch.setBusy(true);
 			dispatch.setNotice(null);
 			try {
-				await api.createFolder({ name, parent });
+				await api.createFolder(data);
 				await dispatch.loadFolders();
 			} catch (error) {
 				dispatch.setNotice({
@@ -221,12 +250,16 @@ const actions = {
 			}
 		};
 	},
-	updateFolder(id, name, parent) {
+	updateFolder(id, payload, parent = 0) {
 		return async ({ dispatch }) => {
+			const data =
+				typeof payload === 'string'
+					? { name: payload, parent }
+					: { ...payload };
 			dispatch.setBusy(true);
 			dispatch.setNotice(null);
 			try {
-				await api.updateFolder(id, { name, parent });
+				await api.updateFolder(id, data);
 				await dispatch.loadFolders();
 			} catch (error) {
 				dispatch.setNotice({
@@ -264,6 +297,25 @@ const actions = {
 			}
 		};
 	},
+	downloadFolder(id) {
+		return async ({ dispatch }) => {
+			dispatch.setBusy(true);
+			dispatch.setNotice(null);
+			try {
+				const { blob, filename } = await api.downloadFolder(id);
+				api.triggerBlobDownload(blob, filename);
+			} catch (error) {
+				dispatch.setNotice({
+					status: 'error',
+					message:
+						error?.message ||
+						__('Unable to download folder.', 'media-manager'),
+				});
+			} finally {
+				dispatch.setBusy(false);
+			}
+		};
+	},
 	assign(folderId, mode, attachmentIds = null) {
 		return async ({ dispatch, select }) => {
 			const ids =
@@ -277,6 +329,26 @@ const actions = {
 				});
 				return false;
 			}
+
+			const folder = findFolderNode(select.getTree(), folderId);
+			const boot = window.mediaManagerAdmin || {};
+			let confirm = false;
+
+			if (folder?.is_private) {
+				const ok = window.confirm(
+					boot.strings?.privateConfirmEnter ||
+						__(
+							'Moving into a private folder replaces public relationships. Continue?',
+							'media-manager'
+						)
+				);
+				if (!ok) {
+					return false;
+				}
+				confirm = true;
+				mode = 'move';
+			}
+
 			dispatch.setBusy(true);
 			dispatch.setNotice(null);
 			try {
@@ -284,11 +356,46 @@ const actions = {
 					attachmentIds: ids,
 					folderId,
 					mode,
+					confirm,
 				});
 				dispatch.setSelectedAttachmentIds([]);
 				await dispatch.loadFolders();
 				return true;
 			} catch (error) {
+				const code = error?.code || error?.data?.code;
+				if (code === 'media_manager_confirmation_required') {
+					const needsEnter = !!error?.data?.needs_enter;
+					const message = needsEnter
+						? boot.strings?.privateConfirmEnter || error.message
+						: boot.strings?.privateConfirmLeave || error.message;
+					const ok = window.confirm(message);
+					if (ok) {
+						try {
+							await api.assignAttachments({
+								attachmentIds: ids,
+								folderId,
+								mode: needsEnter ? 'move' : mode,
+								confirm: true,
+							});
+							dispatch.setSelectedAttachmentIds([]);
+							await dispatch.loadFolders();
+							return true;
+						} catch (retryError) {
+							dispatch.setNotice({
+								status: 'error',
+								message:
+									retryError?.message ||
+									__(
+										'Unable to assign media to folder.',
+										'media-manager'
+									),
+							});
+							return false;
+						}
+					}
+					return false;
+				}
+
 				dispatch.setNotice({
 					status: 'error',
 					message:
@@ -387,3 +494,23 @@ export function registerStore() {
 }
 
 export { actions, selectors };
+
+/**
+ * Find a folder node by ID.
+ *
+ * @param {Array}  nodes Folder tree.
+ * @param {number} id    Folder ID.
+ * @return {Object|null} Folder node.
+ */
+function findFolderNode(nodes, id) {
+	for (const node of nodes || []) {
+		if (node.id === id) {
+			return node;
+		}
+		const child = findFolderNode(node.children || [], id);
+		if (child) {
+			return child;
+		}
+	}
+	return null;
+}

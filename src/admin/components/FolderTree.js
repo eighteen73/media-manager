@@ -149,17 +149,24 @@ export default function FolderTree( {
 							: 'media-manager-folders-toplevel media-manager-folders-ul'
 					}
 				>
-					{ nodes.map( ( node ) => (
-						<FolderNode
-							key={ node.id }
-							node={ node }
-							selectedFolder={ selectedFolder }
-							expanded={ expanded }
-							showCount={ showCount }
-							onSelect={ onSelect }
-							onToggle={ onToggle }
-						/>
-					) ) }
+					{ nodes.map( ( node, index ) => {
+						const previous = nodes[ index - 1 ];
+						const startsUserSection =
+							!! previous?.is_system_root && ! node.is_system_root;
+
+						return (
+							<FolderNode
+								key={ node.id }
+								node={ node }
+								selectedFolder={ selectedFolder }
+								expanded={ expanded }
+								showCount={ showCount }
+								sectionStart={ startsUserSection }
+								onSelect={ onSelect }
+								onToggle={ onToggle }
+							/>
+						);
+					} ) }
 				</ul>
 			) }
 		</div>
@@ -177,6 +184,7 @@ function FolderNode( {
 	selectedFolder,
 	expanded,
 	showCount,
+	sectionStart = false,
 	onSelect,
 	onToggle,
 } ) {
@@ -197,9 +205,17 @@ function FolderNode( {
 	if ( isSelected ) {
 		className += ' is-current';
 	}
+	if ( node.is_system_root || node.is_generated ) {
+		className += ' media-manager-folder-nav--post';
+	}
 
 	return (
-		<li data-count={ node.count }>
+		<li
+			data-count={ node.count }
+			className={
+				sectionStart ? 'media-manager-folders-li--section-start' : undefined
+			}
+		>
 			<span
 				role="button"
 				tabIndex={ 0 }
@@ -227,6 +243,43 @@ function FolderNode( {
 				) }
 				<span className="media-manager-folder-nav__name">
 					{ node.name }
+					{ node.access_mode &&
+						node.access_mode !== 'unrestricted' && (
+							<span
+								className="media-manager-folder-nav__badge media-manager-folder-nav__restricted dashicons dashicons-lock"
+								aria-label={ __(
+									'Restricted folder',
+									'media-manager'
+								) }
+								title={ __(
+									'Restricted folder',
+									'media-manager'
+								) }
+							/>
+						) }
+					{ !! node.is_private && (
+						<span
+							className="media-manager-folder-nav__badge media-manager-folder-nav__private dashicons dashicons-hidden"
+							aria-label={ __(
+								'Private folder',
+								'media-manager'
+							) }
+							title={ __( 'Private folder', 'media-manager' ) }
+						/>
+					) }
+					{ !! node.is_orphaned && (
+						<span
+							className="media-manager-folder-nav__badge media-manager-folder-nav__orphaned dashicons dashicons-warning"
+							aria-label={ __(
+								'Orphaned generated folder',
+								'media-manager'
+							) }
+							title={ __(
+								'Orphaned generated folder',
+								'media-manager'
+							) }
+						/>
+					) }
 				</span>
 				{ showCount && (
 					<span className="media-manager-folder-nav__count">

@@ -18,6 +18,9 @@
 	"require": {
 		"php": ">=7.4"
 	},
+	"suggest": {
+		"ext-zip": "Required to download folder contents as a zip archive."
+	},
 	"require-dev": {
 		"eighteen73/wordpress-coding-standards": "^2.0.0",
 		"phpunit/phpunit": "^9.6",
@@ -25,7 +28,8 @@
 	},
 	"scripts": {
 		"lint": "./vendor/bin/phpcs",
-		"format": "./vendor/bin/phpcbf"
+		"format": "./vendor/bin/phpcbf",
+		"test": "@php vendor/bin/phpunit -c phpunit.xml.dist"
 	},
 	"config": {
 		"allow-plugins": {

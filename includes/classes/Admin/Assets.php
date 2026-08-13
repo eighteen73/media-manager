@@ -10,6 +10,7 @@ namespace Eighteen73\MediaManager\Admin;
 use Eighteen73\MediaManager\Install\Installer;
 use Eighteen73\MediaManager\Permissions\AccessPolicy;
 use Eighteen73\MediaManager\Rest\PreferencesController;
+use Eighteen73\MediaManager\SharedMedia\NetworkLibrary;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -45,23 +46,53 @@ class Assets {
 	}
 
 	/**
-	 * Enqueue assets on Media Library screens.
+	 * Enqueue assets on Media Library and attachment edit screens.
 	 *
 	 * @param string $hook_suffix Current admin page.
 	 * @return void
 	 */
 	public function enqueue( string $hook_suffix ): void {
-		if ( ! $this->access->can_view_folders() ) {
+		$can_view = $this->access->can_view_folders();
+
+		if ( ! $can_view ) {
 			return;
 		}
 
-		$media_screens = [ 'upload.php', 'media-new.php' ];
+		$media_screens   = [ 'upload.php', 'media-new.php' ];
+		$is_media_screen = in_array( $hook_suffix, $media_screens, true );
+		$is_attachment   = $this->is_attachment_edit_screen( $hook_suffix );
 
-		if ( ! in_array( $hook_suffix, $media_screens, true ) ) {
+		if ( ! $is_media_screen && ! $is_attachment ) {
 			return;
 		}
 
 		$this->enqueue_bundle();
+	}
+
+	/**
+	 * Whether the current screen is editing an attachment.
+	 *
+	 * @param string $hook_suffix Current admin page.
+	 * @return bool
+	 */
+	private function is_attachment_edit_screen( string $hook_suffix ): bool {
+		if ( ! in_array( $hook_suffix, [ 'post.php', 'post-new.php' ], true ) ) {
+			return false;
+		}
+
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( $screen && isset( $screen->post_type ) && 'attachment' === $screen->post_type ) {
+			return true;
+		}
+
+		if ( isset( $_GET['post'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$post_id = absint( wp_unslash( $_GET['post'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			if ( $post_id > 0 && 'attachment' === get_post_type( $post_id ) ) {
+				return true;
+			}
+		}
+
+		return isset( $_GET['post_type'] ) && 'attachment' === sanitize_key( wp_unslash( $_GET['post_type'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 	}
 
 	/**
@@ -70,7 +101,10 @@ class Assets {
 	 * @return void
 	 */
 	public function enqueue_media_assets(): void {
-		if ( ! is_admin() || ! $this->access->can_view_folders() ) {
+		$is_admin = is_admin();
+		$can_view = $this->access->can_view_folders();
+
+		if ( ! $is_admin || ! $can_view ) {
 			return;
 		}
 
@@ -156,39 +190,148 @@ class Assets {
 	 * @return array<string, mixed>
 	 */
 	private function get_boot_data(): array {
-		$settings    = Settings::get_settings();
+		$folder_ui   = Settings::get_folder_ui();
 		$preferences = ( new PreferencesController( $this->access ) )->get_item()->get_data();
-		$default     = isset( $settings['default_folder'] ) ? (int) $settings['default_folder'] : 0;
+		$default     = (int) $folder_ui['default_folder'];
+		$roles       = [];
+		foreach ( wp_roles()->get_names() as $slug => $label ) {
+			$roles[] = [
+				'slug'  => $slug,
+				'label' => translate_user_role( $label ),
+			];
+		}
+
+		$storage             = new \Eighteen73\MediaManager\PrivateMedia\StorageConfig();
+		$post_id             = $this->resolve_current_post_id();
+		$post_type           = '';
+		$generated_folder_id = null;
+
+		if ( $post_id > 0 ) {
+			$post = get_post( $post_id );
+			if ( $post instanceof \WP_Post ) {
+				$post_type = $post->post_type;
+				$content   = new \Eighteen73\MediaManager\ContentFolders\ContentFolderService();
+				if ( $content->is_enabled_for_type( $post_type ) ) {
+					$folder_id = $content->folder_id_for_post( $post_id );
+					if ( $folder_id < 1 ) {
+						$ensured = $content->ensure_post_folder( $post_id );
+						if ( ! is_wp_error( $ensured ) ) {
+							$folder_id = (int) $ensured->term_id;
+						}
+					}
+					$generated_folder_id = $folder_id > 0 ? $folder_id : null;
+				}
+			}
+		}
 
 		return [
-			'restUrl'       => esc_url_raw( rest_url( 'media-manager/v1' ) ),
-			'restNonce'     => wp_create_nonce( 'wp_rest' ),
-			'settings'      => $settings,
-			'preferences'   => $preferences,
-			'capabilities'  => [
+			'restUrl'               => esc_url_raw( rest_url( 'media-manager/v1' ) ),
+			'restNonce'             => wp_create_nonce( 'wp_rest' ),
+			'settings'              => $folder_ui,
+			'preferences'           => $preferences,
+			'capabilities'          => [
 				'view'     => $this->access->can_view_folders(),
 				'edit'     => $this->access->can_edit_folders(),
 				'delete'   => $this->access->can_delete_folders(),
 				'assign'   => $this->access->can_assign_folders(),
 				'settings' => $this->access->can_manage_settings(),
+				'private'  => $this->access->can_manage_private_folders(),
+				'shared'   => $this->access->can_use_shared_media(),
 			],
-			'defaultFolder' => $default > 0 ? $default : null,
-			'strings'       => [
-				'allMedia'      => __( 'All files', 'media-manager' ),
-				'uncategorized' => __( 'Uncategorized', 'media-manager' ),
-				'folders'       => __( 'Folders', 'media-manager' ),
-				'newFolder'     => __( 'New Folder', 'media-manager' ),
-				'renameFolder'  => __( 'Rename Folder', 'media-manager' ),
-				'deleteFolder'  => __( 'Delete Folder', 'media-manager' ),
-				'addToFolder'   => __( 'Add to Folder', 'media-manager' ),
-				'moveToFolder'  => __( 'Move to Folder', 'media-manager' ),
-				'moveItem'      => __( 'Move 1 item', 'media-manager' ),
+			'roles'                 => $roles,
+			'currentUserId'         => get_current_user_id(),
+			'currentPostId'         => $post_id > 0 ? $post_id : null,
+			'currentPostType'       => $post_type !== '' ? $post_type : null,
+			'generatedFolderId'     => $generated_folder_id,
+			'privateStorageReady'   => $storage->is_ready(),
+			'privateStorageMessage' => $storage->health()['message'],
+			'defaultFolder'         => $default > 0 ? $default : null,
+			'sharedMedia'           => $this->get_shared_media_boot_data(),
+			'strings'               => [
+				'allMedia'            => __( 'All files', 'media-manager' ),
+				'uncategorized'       => __( 'Uncategorized', 'media-manager' ),
+				'folders'             => __( 'Folders', 'media-manager' ),
+				'newFolder'           => __( 'New Folder', 'media-manager' ),
+				'renameFolder'        => __( 'Rename Folder', 'media-manager' ),
+				'deleteFolder'        => __( 'Delete Folder', 'media-manager' ),
+				'addToFolder'         => __( 'Add to Folder', 'media-manager' ),
+				'moveToFolder'        => __( 'Move to Folder', 'media-manager' ),
+				'moveItem'            => __( 'Move 1 item', 'media-manager' ),
 				/* translators: %d: number of media items */
-				'moveItems'     => __( 'Move %d items', 'media-manager' ),
-				'searchFolders' => __( 'Search folders', 'media-manager' ),
-				'loading'       => __( 'Loading folders…', 'media-manager' ),
-				'empty'         => __( 'No folders yet.', 'media-manager' ),
+				'moveItems'           => __( 'Move %d items', 'media-manager' ),
+				'searchFolders'       => __( 'Search folders', 'media-manager' ),
+				'loading'             => __( 'Loading folders…', 'media-manager' ),
+				'empty'               => __( 'No folders yet.', 'media-manager' ),
+				'privateConfirmEnter' => __(
+					'Moving into a private folder replaces all public folder relationships and stores files outside the public web root. Continue?',
+					'media-manager'
+				),
+				'privateConfirmLeave' => __(
+					'Leaving private storage makes these files publicly reachable again. Continue?',
+					'media-manager'
+				),
 			],
 		];
+	}
+
+	/**
+	 * Shared media boot payload for the media modal.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function get_shared_media_boot_data(): array {
+		$is_multisite = is_multisite();
+		$is_enabled   = NetworkLibrary::is_enabled();
+		$is_allowed   = NetworkLibrary::is_allowed_for_blog();
+		$can_shared   = $this->access->can_use_shared_media();
+		$is_library   = NetworkLibrary::is_library_site();
+		$enabled      = $is_multisite
+			&& $is_enabled
+			&& $is_allowed
+			&& $can_shared
+			&& ! $is_library;
+
+		$post_id             = $this->resolve_current_post_id();
+		$featured_is_network = false;
+		if ( $post_id > 0 ) {
+			$featured_is_network = (bool) get_post_meta(
+				$post_id,
+				\Eighteen73\MediaManager\SharedMedia\AttachmentResolver::META_FEATURED_NETWORK,
+				true
+			);
+		}
+
+		return [
+			'enabled'           => $enabled,
+			'networkLibraryId'  => NetworkLibrary::get_library_id(),
+			'tabTitle'          => NetworkLibrary::tab_title(),
+			'featuredIsNetwork' => $featured_is_network,
+		];
+	}
+
+	/**
+	 * Resolve the post being edited in the current admin/media context.
+	 *
+	 * @return int
+	 */
+	private function resolve_current_post_id(): int {
+		$post_id = 0;
+
+		if ( isset( $_GET['post'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$post_id = absint( wp_unslash( $_GET['post'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		}
+
+		if ( $post_id < 1 && isset( $_REQUEST['post_id'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$post_id = absint( wp_unslash( $_REQUEST['post_id'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		}
+
+		if ( $post_id < 1 ) {
+			$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+			if ( $screen && isset( $screen->base ) && 'post' === $screen->base && isset( $_GET['post'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+				$post_id = absint( wp_unslash( $_GET['post'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			}
+		}
+
+		return $post_id;
 	}
 }

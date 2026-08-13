@@ -7,6 +7,7 @@ import { dispatch, select } from '@wordpress/data';
 import './index.scss';
 import { registerStore, STORE_NAME } from './store';
 import FolderSidebar from './components/FolderSidebar';
+import SharedFolderSidebar from './components/SharedFolderSidebar';
 import {
 	mountMediaLibrarySidebar,
 	observeLibraryCollection,
@@ -16,8 +17,17 @@ import {
 	subscribeToSelection,
 	ensureModalFolderMount,
 } from './adapters/media-modal';
+import { observeAttachmentDetails } from './adapters/attachment-details';
+import AttachmentFolderField from './components/AttachmentFolderField';
+import {
+	registerSharedMediaTab,
+	isSharedMediaState,
+} from './adapters/shared-media';
 import { enableFolderDragDrop } from './adapters/drag-drop';
-import { mountUploadFolderSelects } from './adapters/uploader';
+import {
+	mountUploadFolderSelects,
+	observeUploadsForFolderCounts,
+} from './adapters/uploader';
 
 registerStore();
 
@@ -78,45 +88,135 @@ function bootstrapModals() {
 	teardowns.push(
 		observeMediaFrames( {
 			onFrame( frame ) {
-				const mount = () => {
-					const el = ensureModalFolderMount( frame );
-					if ( ! el ) {
-						return;
+				let reactRoot = null;
+				let unsubscribe = null;
+				let mountEl = null;
+				let retryTimer = null;
+				let sharedMode = false;
+
+				const cleanupMount = () => {
+					if ( retryTimer ) {
+						window.clearTimeout( retryTimer );
+						retryTimer = null;
 					}
-
-					if ( el.dataset.mounted === '1' ) {
-						return;
-					}
-					el.dataset.mounted = '1';
-
-					const reactRoot = createRoot( el );
-					const library =
-						typeof frame.state === 'function'
-							? frame.state()?.get?.( 'library' )
-							: frame.state?.get?.( 'library' );
-
-					reactRoot.render(
-						<FolderSidebar
-							collection={ library }
-							frame={ frame }
-							compact
-						/>
-					);
-
-					const unsubscribe = subscribeToSelection( frame, ( ids ) => {
-						dispatch( STORE_NAME ).setSelectedAttachmentIds( ids );
-					} );
-
-					frame.on?.( 'close', () => {
+					if ( unsubscribe ) {
 						unsubscribe();
+						unsubscribe = null;
+					}
+					if ( reactRoot ) {
 						reactRoot.unmount();
-						delete el.dataset.mounted;
-					} );
+						reactRoot = null;
+					}
+					if ( mountEl ) {
+						delete mountEl.dataset.mounted;
+						mountEl.remove();
+						mountEl = null;
+					}
+					frame.$el
+						?.find?.( '.attachments-browser' )
+						?.removeClass?.( 'has-media-manager-folders' );
+					frame.$el
+						?.get?.( 0 )
+						?.classList.remove( 'has-media-manager-folders' );
 				};
 
-				frame.on?.( 'ready', mount );
-				frame.on?.( 'content:render:browse', mount );
-				mount();
+				const renderSidebar = ( eventArg ) => {
+					let pendingView = null;
+					if ( eventArg && typeof eventArg === 'object' ) {
+						if ( eventArg.view?.el || eventArg.view?.$el ) {
+							// content:create payload `{ view }`.
+							pendingView = eventArg.view;
+						} else if (
+							eventArg.el?.classList?.contains(
+								'attachments-browser'
+							)
+						) {
+							// content:render / activate may pass the browser view.
+							pendingView = eventArg;
+						}
+					}
+					const el = ensureModalFolderMount( frame, pendingView );
+					if ( ! el ) {
+						if ( ! retryTimer ) {
+							retryTimer = window.setTimeout( () => {
+								retryTimer = null;
+								renderSidebar();
+							}, 50 );
+						}
+						return;
+					}
+
+					const state =
+						typeof frame.state === 'function' ? frame.state() : null;
+					const nextShared = isSharedMediaState( state );
+
+					// Same browser node already hosting the matching sidebar mode.
+					if (
+						el === mountEl &&
+						el.dataset.mounted === '1' &&
+						reactRoot &&
+						nextShared === sharedMode
+					) {
+						return;
+					}
+
+					if ( reactRoot && el !== mountEl ) {
+						reactRoot.unmount();
+						reactRoot = null;
+						if ( unsubscribe ) {
+							unsubscribe();
+							unsubscribe = null;
+						}
+					}
+
+					mountEl = el;
+					el.dataset.mounted = '1';
+					sharedMode = nextShared;
+
+					if ( ! reactRoot ) {
+						reactRoot = createRoot( el );
+					}
+
+					const library = state?.get?.( 'library' ) || null;
+
+					if ( sharedMode ) {
+						reactRoot.render(
+							<SharedFolderSidebar
+								collection={ library }
+								frame={ frame }
+							/>
+						);
+					} else {
+						reactRoot.render(
+							<FolderSidebar
+								collection={ library }
+								frame={ frame }
+								compact
+							/>
+						);
+					}
+
+					if ( ! unsubscribe ) {
+						unsubscribe = subscribeToSelection( frame, ( ids ) => {
+							dispatch( STORE_NAME ).setSelectedAttachmentIds(
+								ids
+							);
+						} );
+					}
+				};
+
+				frame.on?.( 'ready', renderSidebar );
+				frame.on?.( 'content:activate:browse', renderSidebar );
+				frame.on?.( 'content:render:browse', renderSidebar );
+				frame.on?.( 'content:create:browse', renderSidebar );
+				frame.on?.( 'content:activate:media-manager-shared', renderSidebar );
+				frame.on?.( 'content:render:media-manager-shared', renderSidebar );
+				frame.on?.( 'content:create:media-manager-shared', renderSidebar );
+				frame.on?.( 'content:render:upload', cleanupMount );
+				frame.on?.( 'content:activate:upload', cleanupMount );
+				frame.on?.( 'close', cleanupMount );
+				frame.on?.( 'activate', renderSidebar );
+				renderSidebar();
 			},
 		} )
 	);
@@ -135,11 +235,9 @@ function bootstrapUploadFolderSelect() {
 	);
 
 	if ( ! hasSidebarRoot ) {
-		const initial =
-			boot.preferences?.previous_folder ?? boot.defaultFolder ?? null;
-		if ( initial && Number( initial ) > 0 ) {
-			dispatch( STORE_NAME ).selectFolder( Number( initial ) );
-		}
+		// Load folders for Choose folder controls. Do not pre-select the
+		// generated post folder here — that would filter the modal library to an
+		// often-empty folder. Upload defaults use generatedFolderId as fallback.
 		dispatch( STORE_NAME ).loadFolders();
 	}
 
@@ -148,12 +246,17 @@ function bootstrapUploadFolderSelect() {
 			getProps: () => {
 				const store = select( STORE_NAME );
 				const selected = store.getSelectedFolder();
+				const generated =
+					boot.generatedFolderId &&
+					Number( boot.generatedFolderId ) > 0
+						? Number( boot.generatedFolderId )
+						: null;
 				return {
 					folders: store.getTree(),
 					value:
 						selected && Number( selected ) > 0
 							? Number( selected )
-							: null,
+							: generated,
 					canAssign: !! boot.capabilities.assign,
 				};
 			},
@@ -169,6 +272,42 @@ function bootstrapUploadFolderSelect() {
 }
 
 /**
+ * Mount the Folders field on the classic attachment edit metabox.
+ */
+function bootstrapAttachmentEdit() {
+	const root = document.getElementById( 'media-manager-attachment-folders' );
+	if ( ! root || ! boot.capabilities?.assign ) {
+		return;
+	}
+
+	const attachmentId = Number( root.dataset.attachmentId || 0 );
+	let folderIds = [];
+	try {
+		folderIds = JSON.parse( root.dataset.folderIds || '[]' );
+	} catch ( _err ) {
+		folderIds = [];
+	}
+	if ( ! Array.isArray( folderIds ) ) {
+		folderIds = [];
+	}
+	folderIds = folderIds.map( Number ).filter( ( id ) => id > 0 );
+
+	const reactRoot = createRoot( root );
+	reactRoot.render(
+		<AttachmentFolderField
+			attachmentId={ attachmentId }
+			folderIds={ folderIds }
+			canAssign
+			layout="metabox"
+			onFoldersChange={ ( next ) => {
+				root.dataset.folderIds = JSON.stringify( next );
+			} }
+		/>
+	);
+	teardowns.push( () => reactRoot.unmount() );
+}
+
+/**
  * Boot once. admin_footer prints the mount node before footer scripts.
  */
 function bootWhenReady() {
@@ -177,8 +316,12 @@ function bootWhenReady() {
 	}
 	booted = true;
 
+	teardowns.push( registerSharedMediaTab() );
 	bootstrapModals();
+	teardowns.push( observeAttachmentDetails() );
 	bootstrapUploadFolderSelect();
+	bootstrapAttachmentEdit();
+	teardowns.push( observeUploadsForFolderCounts() );
 	teardowns.push( enableFolderDragDrop() );
 
 	const startLibrary = () => {

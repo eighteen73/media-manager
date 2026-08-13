@@ -6,6 +6,118 @@ import { createRoot } from '@wordpress/element';
 import UploadFolderSelect from '../components/UploadFolderSelect';
 
 /**
+ * Debounce delay (ms) when refreshing folder counts after uploads.
+ * Short enough to feel live per-file; long enough to coalesce bursts.
+ */
+const UPLOAD_COUNT_REFRESH_MS = 150;
+
+/**
+ * Refresh folder tree/counts after a successful media upload.
+ *
+ * Uploads are assigned server-side; the client must refetch the tree so
+ * sidebar counts stay in sync (same as drag-assign calling loadFolders).
+ *
+ * @return {void}
+ */
+function refreshFolderCountsAfterUpload() {
+	const loadFolders = window.wp?.data
+		?.dispatch?.( 'media-manager/folders' )
+		?.loadFolders;
+	if ( typeof loadFolders === 'function' ) {
+		loadFolders();
+	}
+}
+
+/**
+ * Observe wp.Uploader.queue and reload folder counts as each upload finishes.
+ *
+ * @return {Function} Teardown function.
+ */
+export function observeUploadsForFolderCounts() {
+	let cancelled = false;
+	let timer = null;
+	let boundQueue = null;
+	let pollTimer = null;
+	let tries = 0;
+
+	const scheduleRefresh = () => {
+		if ( cancelled ) {
+			return;
+		}
+		if ( timer ) {
+			window.clearTimeout( timer );
+		}
+		timer = window.setTimeout( () => {
+			timer = null;
+			if ( ! cancelled ) {
+				refreshFolderCountsAfterUpload();
+			}
+		}, UPLOAD_COUNT_REFRESH_MS );
+	};
+
+	const onChangeUploading = ( attachment ) => {
+		if ( attachment?.get?.( 'uploading' ) ) {
+			return;
+		}
+		scheduleRefresh();
+	};
+
+	const onAdd = ( attachment ) => {
+		if ( ! attachment || typeof attachment.on !== 'function' ) {
+			return;
+		}
+
+		if ( attachment.get?.( 'uploading' ) ) {
+			attachment.on( 'change:uploading', onChangeUploading );
+			return;
+		}
+
+		// Already finished when added (some upload paths).
+		scheduleRefresh();
+	};
+
+	const bindQueue = ( queue ) => {
+		if ( ! queue || typeof queue.on !== 'function' || boundQueue === queue ) {
+			return !! boundQueue;
+		}
+		boundQueue = queue;
+		queue.on( 'add', onAdd );
+		return true;
+	};
+
+	const tryBind = () => {
+		if ( cancelled ) {
+			return true;
+		}
+		return bindQueue( window.wp?.Uploader?.queue );
+	};
+
+	if ( ! tryBind() ) {
+		pollTimer = window.setInterval( () => {
+			tries += 1;
+			if ( tryBind() || tries > 40 ) {
+				window.clearInterval( pollTimer );
+				pollTimer = null;
+			}
+		}, 250 );
+	}
+
+	return () => {
+		cancelled = true;
+		if ( pollTimer ) {
+			window.clearInterval( pollTimer );
+			pollTimer = null;
+		}
+		if ( timer ) {
+			window.clearTimeout( timer );
+			timer = null;
+		}
+		boundQueue?.off?.( 'add', onAdd );
+		boundQueue = null;
+	};
+}
+
+/**
  * Set the folder ID on an uploader's multipart params.
  *
  * @param {Object}      uploader Uploader / plupload wrapper.
@@ -94,7 +206,10 @@ export function syncAllUploaders( folderId, frame = null ) {
 }
 
 /**
- * Bind folder updates to a media frame uploader.
+ * Bind folder updates to a media frame uploader only.
+ *
+ * Library browse filtering is handled separately via setCollectionFolder so the
+ * upload destination (e.g. a generated post folder) does not hide the grid.
  *
  * @param {Object}      frame    Media frame.
  * @param {number|null} folderId Folder selection.
@@ -106,22 +221,6 @@ export function syncFrameUploader( frame, folderId ) {
 
 	const uploader = frame.uploader?.uploader || frame.uploader;
 	setUploaderFolder( uploader, folderId );
-
-	const state = typeof frame.state === 'function' ? frame.state() : null;
-	const library =
-		state?.get?.( 'library' ) ||
-		( typeof frame.state?.get === 'function'
-			? frame.state.get( 'library' )
-			: null );
-
-	if ( library?.props?.set ) {
-		library.props.set( {
-			media_manager_folder:
-				folderId === null || typeof folderId === 'undefined'
-					? 'all'
-					: folderId,
-		} );
-	}
 }
 
 /**

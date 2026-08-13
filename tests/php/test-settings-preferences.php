@@ -27,7 +27,17 @@ class Test_Settings_And_Preferences extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Settings defaults and sanitisation.
+	 * Tear down filters.
+	 *
+	 * @return void
+	 */
+	public function tear_down() {
+		remove_all_filters( 'media_manager_folder_ui' );
+		parent::tear_down();
+	}
+
+	/**
+	 * Stored settings sanitisation covers path and post types only.
 	 *
 	 * @return void
 	 */
@@ -35,19 +45,57 @@ class Test_Settings_And_Preferences extends WP_UnitTestCase {
 		$settings = new Settings();
 		$clean    = $settings->sanitize(
 			[
-				'show_count'         => '1',
-				'show_search'        => '',
-				'show_list_view'     => 'yes',
-				'show_modal_sidebar' => 0,
-				'default_folder'     => 999999,
+				'private_storage_path'    => " /tmp/private-media\0 ",
+				'generated_media_folders' => [
+					'post'           => '1',
+					'wp_navigation'  => '1',
+					'not_a_real_type'=> '1',
+				],
+				'show_count'              => '1',
+				'default_folder'          => 999999,
 			]
 		);
 
-		$this->assertTrue( $clean['show_count'] );
-		$this->assertFalse( $clean['show_search'] );
-		$this->assertTrue( $clean['show_list_view'] );
-		$this->assertFalse( $clean['show_modal_sidebar'] );
-		$this->assertSame( 0, $clean['default_folder'] );
+		$this->assertSame( '/tmp/private-media', $clean['private_storage_path'] );
+		$this->assertTrue( $clean['generated_media_folders']['post'] );
+		$this->assertArrayNotHasKey( 'wp_navigation', $clean['generated_media_folders'] );
+		$this->assertArrayNotHasKey( 'not_a_real_type', $clean['generated_media_folders'] );
+		$this->assertArrayNotHasKey( 'show_count', $clean );
+		$this->assertArrayNotHasKey( 'default_folder', $clean );
+	}
+
+	/**
+	 * Folder UI defaults are always-on / All Media.
+	 *
+	 * @return void
+	 */
+	public function test_folder_ui_defaults() {
+		$ui = Settings::get_folder_ui();
+
+		$this->assertTrue( $ui['show_count'] );
+		$this->assertTrue( $ui['show_search'] );
+		$this->assertTrue( $ui['show_list_view'] );
+		$this->assertTrue( $ui['show_modal_sidebar'] );
+		$this->assertSame( 0, $ui['default_folder'] );
+	}
+
+	/**
+	 * Folder UI behaviour can be overridden via filter.
+	 *
+	 * @return void
+	 */
+	public function test_folder_ui_filter_override() {
+		add_filter(
+			'media_manager_folder_ui',
+			static function ( $ui ) {
+				$ui['show_count'] = false;
+				return $ui;
+			}
+		);
+
+		$ui = Settings::get_folder_ui();
+		$this->assertFalse( $ui['show_count'] );
+		$this->assertTrue( $ui['show_search'] );
 	}
 
 	/**
