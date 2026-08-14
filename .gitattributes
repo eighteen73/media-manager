@@ -22,7 +22,7 @@
 /README.md export-ignore
 /tsconfig.json export-ignore
 /webpack.config.js export-ignore
-/eslint.config.mjs export-ignore
+/eslint.config.js export-ignore
 /jest.config.js export-ignore
 /phpunit.xml.dist export-ignore
-/playwright.config.ts export-ignore
+/playwright.config.js export-ignore
